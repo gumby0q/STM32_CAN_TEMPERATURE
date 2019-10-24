@@ -56,6 +56,9 @@ uint8_t TxData[8];
 uint8_t RxData[8];
 uint32_t TxMailbox;
 
+struct bme280_data comp_data;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -282,6 +285,9 @@ int main(void)
   TxData[7] = 8;
 
 
+  HAL_GPIO_WritePin(CS0_BME280_GPIO_Port, CS0_BME280_Pin, GPIO_PIN_SET);
+  setup_bme280();
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -292,9 +298,9 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-//	  int8_t rslt;
+	  int8_t rslt;
 //	  struct bme280_data comp_data;
-//	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
+	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      printf("%ld, %ld, %ld\r\n",comp_data->temperature, comp_data->pressure, comp_data->humidity);
 
 	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
