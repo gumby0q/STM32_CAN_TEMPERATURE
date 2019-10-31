@@ -66,6 +66,8 @@ void Error_Handler(void);
 #define CS0_BME280_GPIO_Port GPIOA
 #define DISPLAY_RESET_Pin GPIO_PIN_0
 #define DISPLAY_RESET_GPIO_Port GPIOB
+#define DISPLAY_DC_Pin GPIO_PIN_1
+#define DISPLAY_DC_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */
