@@ -269,24 +269,28 @@ int main(void)
 	  Error_Handler();
   }
 
-  TxHeader.StdId = 0x321;
-  TxHeader.ExtId = 0x01;
+  TxHeader.StdId = 0x0f0;
+  TxHeader.ExtId = 0x00;
   TxHeader.RTR = CAN_RTR_DATA;
   TxHeader.IDE = CAN_ID_STD;
-  TxHeader.DLC = 8;
+  TxHeader.DLC = 4;
   TxHeader.TransmitGlobalTime = DISABLE;
   TxData[0] = 1;
   TxData[1] = 2;
   TxData[2] = 3;
   TxData[3] = 4;
-  TxData[4] = 5;
-  TxData[5] = 6;
-  TxData[6] = 7;
-  TxData[7] = 8;
+//  TxData[4] = 5;
+//  TxData[5] = 6;
+//  TxData[6] = 7;
+//  TxData[7] = 8;
 
 
   HAL_GPIO_WritePin(CS0_BME280_GPIO_Port, CS0_BME280_Pin, GPIO_PIN_SET);
   setup_bme280();
+
+	uint32_t pressure;
+	int32_t temperature;
+	uint32_t humidity;
 
   /* USER CODE END 2 */
 
@@ -303,9 +307,42 @@ int main(void)
 	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      printf("%ld, %ld, %ld\r\n",comp_data->temperature, comp_data->pressure, comp_data->humidity);
 
+	  pressure = comp_data.pressure;
+	  temperature = comp_data.temperature;
+	  humidity = comp_data.humidity;
+
+
+	  /* id for temperature */
+	  TxHeader.StdId = 0x0f0;
+
+	  for (int i=0; i<4 ;++i) {
+		  TxData[i] = ((uint8_t*)&pressure)[i];
+	  }
+
+      /* data length */
 	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
-	  HAL_Delay(2000);
-	  TxData[7] = TxData[7] + 1;
+	  HAL_Delay(3000);
+
+	  /* id for temperature */
+	  TxHeader.StdId = 0x0f1;
+
+	  for (int i=0; i<4 ;++i) {
+		  TxData[i] = ((uint8_t*)&temperature)[i];
+	  }
+	  /* data length */
+	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+	  HAL_Delay(3000);
+
+	  /* id for temperature */
+	  TxHeader.StdId = 0x0f2;
+
+	  for (int i=0; i<4 ;++i) {
+		  TxData[i] = ((uint8_t*)&humidity)[i];
+	  }
+	  /* data length */
+	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+	  HAL_Delay(3000);
+
 
 //	  HAL_GPIO_TogglePin(GPIOC, LED_Pin);
   }
