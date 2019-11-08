@@ -2,8 +2,8 @@ main.c:117:6:user_delay_ms	0	static
 main.c:126:8:user_spi_read	40	dynamic
 main.c:169:8:user_spi_write	16	dynamic
 main.c:85:8:setup_bme280	8	static
-main.c:356:6:SystemClock_Config	72	static
+main.c:353:6:SystemClock_Config	72	static
 main.c:214:5:main	72	static
-main.c:512:6:HAL_CAN_TxMailbox0CompleteCallback	0	static
-main.c:516:6:HAL_CAN_RxFifo0MsgPendingCallback	8	static
-main.c:527:6:Error_Handler	0	static
+main.c:509:6:HAL_CAN_TxMailbox0CompleteCallback	0	static
+main.c:513:6:HAL_CAN_RxFifo0MsgPendingCallback	8	static
+main.c:524:6:Error_Handler	0	static

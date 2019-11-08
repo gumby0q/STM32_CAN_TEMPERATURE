@@ -34,7 +34,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define DEVICE_CAN_ID 0x0f0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -269,7 +269,7 @@ int main(void)
 	  Error_Handler();
   }
 
-  TxHeader.StdId = 0x0f0;
+  TxHeader.StdId = DEVICE_CAN_ID;
   TxHeader.ExtId = 0x00;
   TxHeader.RTR = CAN_RTR_DATA;
   TxHeader.IDE = CAN_ID_STD;
@@ -301,7 +301,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
 	  int8_t rslt;
 //	  struct bme280_data comp_data;
 	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
@@ -313,7 +312,7 @@ int main(void)
 
 
 	  /* id for temperature */
-	  TxHeader.StdId = 0x0f0;
+	  TxHeader.StdId = DEVICE_CAN_ID;
 
 	  for (int i=0; i<4 ;++i) {
 		  TxData[i] = ((uint8_t*)&pressure)[i];
@@ -324,7 +323,7 @@ int main(void)
 	  HAL_Delay(3000);
 
 	  /* id for temperature */
-	  TxHeader.StdId = 0x0f1;
+	  TxHeader.StdId = DEVICE_CAN_ID + 1;
 
 	  for (int i=0; i<4 ;++i) {
 		  TxData[i] = ((uint8_t*)&temperature)[i];
@@ -334,7 +333,7 @@ int main(void)
 	  HAL_Delay(3000);
 
 	  /* id for temperature */
-	  TxHeader.StdId = 0x0f2;
+	  TxHeader.StdId = DEVICE_CAN_ID + 2;
 
 	  for (int i=0; i<4 ;++i) {
 		  TxData[i] = ((uint8_t*)&humidity)[i];
@@ -342,8 +341,6 @@ int main(void)
 	  /* data length */
 	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
 	  HAL_Delay(3000);
-
-
 //	  HAL_GPIO_TogglePin(GPIOC, LED_Pin);
   }
   /* USER CODE END 3 */

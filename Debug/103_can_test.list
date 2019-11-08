@@ -5083,7 +5083,7 @@ static void MX_GPIO_Init(void)
  8002206:	9a04      	ldr	r2, [sp, #16]
   __HAL_RCC_GPIOB_CLK_ENABLE();
  8002208:	699a      	ldr	r2, [r3, #24]
-  TxHeader.StdId = 0x0f0;
+  TxHeader.StdId = DEVICE_CAN_ID;
  800220a:	4e76      	ldr	r6, [pc, #472]	; (80023e4 <main+0x244>)
   __HAL_RCC_GPIOB_CLK_ENABLE();
  800220c:	f042 0208 	orr.w	r2, r2, #8
@@ -5253,7 +5253,7 @@ static void MX_GPIO_Init(void)
  80022ee:	4651      	mov	r1, sl
  80022f0:	4628      	mov	r0, r5
  80022f2:	f7fe fb1b 	bl	800092c <HAL_CAN_ActivateNotification>
-  TxHeader.StdId = 0x0f0;
+  TxHeader.StdId = DEVICE_CAN_ID;
  80022f6:	23f0      	movs	r3, #240	; 0xf0
   TxHeader.ExtId = 0x00;
  80022f8:	e886 0018 	stmia.w	r6, {r3, r4}
@@ -5310,7 +5310,7 @@ static void MX_GPIO_Init(void)
  8002346:	9300      	str	r3, [sp, #0]
 	  humidity = comp_data.humidity;
  8002348:	9206      	str	r2, [sp, #24]
-	  TxHeader.StdId = 0x0f0;
+	  TxHeader.StdId = DEVICE_CAN_ID;
  800234a:	22f0      	movs	r2, #240	; 0xf0
  800234c:	6032      	str	r2, [r6, #0]
 		  TxData[i] = ((uint8_t*)&pressure)[i];
@@ -5332,7 +5332,7 @@ static void MX_GPIO_Init(void)
 	  HAL_Delay(3000);
  800236c:	f640 30b8 	movw	r0, #3000	; 0xbb8
  8002370:	f7fe f8f4 	bl	800055c <HAL_Delay>
-	  TxHeader.StdId = 0x0f1;
+	  TxHeader.StdId = DEVICE_CAN_ID + 1;
  8002374:	23f1      	movs	r3, #241	; 0xf1
  8002376:	6033      	str	r3, [r6, #0]
 		  TxData[i] = ((uint8_t*)&temperature)[i];
@@ -5359,7 +5359,7 @@ static void MX_GPIO_Init(void)
 	  HAL_Delay(3000);
  800239c:	f640 30b8 	movw	r0, #3000	; 0xbb8
  80023a0:	f7fe f8dc 	bl	800055c <HAL_Delay>
-	  TxHeader.StdId = 0x0f2;
+	  TxHeader.StdId = DEVICE_CAN_ID + 2;
  80023a4:	23f2      	movs	r3, #242	; 0xf2
  80023a6:	6033      	str	r3, [r6, #0]
 		  TxData[i] = ((uint8_t*)&humidity)[i];
