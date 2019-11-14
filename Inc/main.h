@@ -60,13 +60,12 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define LED_Pin GPIO_PIN_13
 #define LED_GPIO_Port GPIOC
-#define CS0_BME280_Pin GPIO_PIN_4
-#define CS0_BME280_GPIO_Port GPIOA
-
-#define DISPLAY_RESET_Pin GPIO_PIN_0
-#define DISPLAY_RESET_GPIO_Port GPIOB
 #define CS1_DISPLAY_Pin GPIO_PIN_3
 #define CS1_DISPLAY_GPIO_Port GPIOA
+#define CS0_BME280_Pin GPIO_PIN_4
+#define CS0_BME280_GPIO_Port GPIOA
+#define DISPLAY_RESET_Pin GPIO_PIN_0
+#define DISPLAY_RESET_GPIO_Port GPIOB
 #define DISPLAY_DC_Pin GPIO_PIN_1
 #define DISPLAY_DC_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
