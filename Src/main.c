@@ -26,6 +26,7 @@
 #include <string.h>
 #include "bme280.h"
 #include "u8g2.h"
+#include <stdio.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,27 +36,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-uint8_t u8x8_stm32_gpio_and_delay(U8X8_UNUSED u8x8_t *u8x8,
-    U8X8_UNUSED uint8_t msg, U8X8_UNUSED uint8_t arg_int,
-    U8X8_UNUSED void *arg_ptr)
-{
-  switch (msg)
-  {
-  case U8X8_MSG_GPIO_AND_DELAY_INIT:
-    HAL_Delay(1);
-    break;
-  case U8X8_MSG_DELAY_MILLI:
-    HAL_Delay(arg_int);
-    break;
-  case U8X8_MSG_GPIO_DC:
-    HAL_GPIO_WritePin(OLED_DC_GPIO_Port, OLED_DC_Pin, arg_int);
-    break;
-  case U8X8_MSG_GPIO_RESET:
-    HAL_GPIO_WritePin(OLED_RES_GPIO_Port, OLED_RES_Pin, arg_int);
-    break;
-  }
-  return 1;
-}
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -70,6 +51,11 @@ SPI_HandleTypeDef hspi1;
 
 /* USER CODE BEGIN PV */
 static u8g2_t u8g2;
+
+int32_t temperature;
+uint32_t pressure;
+uint32_t humidity;
+
 
 CAN_FilterTypeDef sFilterConfig;
 CAN_TxHeaderTypeDef TxHeader;
@@ -240,10 +226,10 @@ uint8_t u8x8_stm32_gpio_and_delay(U8X8_UNUSED u8x8_t *u8x8,
     HAL_Delay(arg_int);
     break;
   case U8X8_MSG_GPIO_DC:
-    HAL_GPIO_WritePin(OLED_DC_GPIO_Port, OLED_DC_Pin, arg_int);
+    HAL_GPIO_WritePin(DISPLAY_DC_GPIO_Port, DISPLAY_DC_Pin, arg_int);
     break;
   case U8X8_MSG_GPIO_RESET:
-    HAL_GPIO_WritePin(OLED_RES_GPIO_Port, OLED_RES_Pin, arg_int);
+    HAL_GPIO_WritePin(DISPLAY_RESET_GPIO_Port, DISPLAY_RESET_Pin, arg_int);
     break;
   }
   return 1;
@@ -260,11 +246,13 @@ uint8_t u8x8_byte_4wire_hw_spi(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
   case U8X8_MSG_BYTE_INIT:
     break;
   case U8X8_MSG_BYTE_SET_DC:
-    HAL_GPIO_WritePin(OLED_DC_GPIO_Port, OLED_DC_Pin, arg_int);
+    HAL_GPIO_WritePin(DISPLAY_DC_GPIO_Port, DISPLAY_DC_Pin, arg_int);
     break;
   case U8X8_MSG_BYTE_START_TRANSFER:
+		HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_RESET);
     break;
   case U8X8_MSG_BYTE_END_TRANSFER:
+		HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_SET);
     break;
   default:
     return 0;
@@ -278,6 +266,7 @@ uint8_t u8x8_byte_4wire_hw_spi(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
   * @brief  The application entry point.
   * @retval int
   */
+
 int main(void)
 {
   /* USER CODE BEGIN 1 */
@@ -336,7 +325,7 @@ int main(void)
 	  Error_Handler();
   }
 
-  TxHeader.StdId = 0x321;
+  TxHeader.StdId = 0x021;
   TxHeader.ExtId = 0x01;
   TxHeader.RTR = CAN_RTR_DATA;
   TxHeader.IDE = CAN_ID_STD;
@@ -356,39 +345,73 @@ int main(void)
   setup_bme280();
 
 
-  u8g2_Setup_ssd1306_128x64_noname_1(&u8g2, U8G2_R0, u8x8_byte_4wire_hw_spi,
+  HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_SET);
+  u8g2_Setup_ssd1306_128x64_noname_1(&u8g2, U8G2_R1, u8x8_byte_4wire_hw_spi,
       u8x8_stm32_gpio_and_delay);
   u8g2_InitDisplay(&u8g2);
   u8g2_SetPowerSave(&u8g2, 0);
+  int8_t rslt;
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+	char tmp_string[20];
+    u8g2_FirstPage(&u8g2);
+    do
+	 {
+	    u8g2_SetFont(&u8g2, u8g2_font_ncenB14_tr);
+		u8g2_DrawStr(&u8g2, 5, 30, "Hello world ");
+	 } while (u8g2_NextPage(&u8g2));
+	u8g2_SetFont(&u8g2, u8g2_font_logisoso18_tr );
+
+	int16_t tempInt;
+	uint32_t tempUInt;
+	int16_t tempDec;
+
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
-	  int8_t rslt;
 //	  struct bme280_data comp_data;
-	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
-//      printf("%ld, %ld, %ld\r\n",comp_data->temperature, comp_data->pressure, comp_data->humidity);
+//	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
+//      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
+//	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+	  HAL_Delay(1000);
+//	  TxData[7] = TxData[7] + 1;
 
-	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
-	  HAL_Delay(2000);
-	  TxData[7] = TxData[7] + 1;
+	    HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+		char tmp_string[100];
+		u8g2_FirstPage(&u8g2);
+		do
+		 {
+//			tempUInt = (uint32_t)(pressure/10000);
+//		    tempDec = (uint16_t)(pressure%10000);
+//		    sprintf(tmp_string, "P %d,%lu hPa", tempUInt, tempDec);
+//			u8g2_DrawStr(&u8g2, 0, 15, tmp_string);
+		    tempInt = (int16_t)(temperature/100);
+		    tempDec = (uint16_t)(temperature%100);
+		    sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
+			u8g2_DrawStr(&u8g2, 0, 20, tmp_string);
+			tempUInt = (uint32_t)(humidity/1024);
+		    tempDec = (uint16_t)(humidity%1024);
+		    sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
+			u8g2_DrawStr(&u8g2, 0, 45, tmp_string);
 
-	  u8g2_FirstPage(&u8g2);
-	    do
-	    {
-	      u8g2_SetFont(&u8g2, u8g2_font_ncenB14_tr);
-	      u8g2_DrawStr(&u8g2, 0, 15, "Hello World!");
-	      u8g2_DrawCircle(&u8g2, 64, 40, 10, U8G2_DRAW_ALL);
-	    } while (u8g2_NextPage(&u8g2));
+			tempInt = (int16_t)(temperature/100);
+		    tempDec = (uint16_t)(temperature%100);
+		    sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
+			u8g2_DrawStr(&u8g2, 0, 80, tmp_string);
+			tempUInt = (uint32_t)(humidity/1024);
+		    tempDec = (uint16_t)(humidity%1024);
+		    sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
+			u8g2_DrawStr(&u8g2, 0, 105, tmp_string);
+		 } while (u8g2_NextPage(&u8g2));
 
-//	  HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+
+
   }
   /* USER CODE END 3 */
 }
@@ -557,10 +580,27 @@ void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan_)
 {
 	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
 }
+
+
+
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 {
 	HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData);
 	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+
+	 uint32_t u;
+	  u = RxData[0];
+	  u += (uint32_t)(RxData[1] << 8);
+	  u += (uint32_t)(RxData[2] << 16);
+	  u += (uint32_t)(RxData[3] << 24);
+
+	if(RxHeader.StdId==0xf0){
+		pressure = u;
+	}else if(RxHeader.StdId==0xf0+1){
+		temperature = u;
+	}else if(RxHeader.StdId==0xf0+2){
+		humidity = u;
+	}
 }
 /* USER CODE END 4 */
 
