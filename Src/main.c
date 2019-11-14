@@ -58,6 +58,12 @@ int32_t temperature;
 uint32_t pressure;
 uint32_t humidity;
 
+volatile uint8_t temperature1timeout = 0;
+volatile uint8_t temperature2timeout = 0;
+volatile uint8_t humidity1timeout = 0;
+volatile uint8_t humidity2timeout = 0;
+
+#define DATA_WAIT_TIMEOUT 100
 
 CAN_FilterTypeDef sFilterConfig;
 CAN_TxHeaderTypeDef TxHeader;
@@ -354,7 +360,7 @@ int main(void)
   u8g2_InitDisplay(&u8g2);
   u8g2_SetPowerSave(&u8g2, 0);
   int8_t rslt;
-
+  HAL_TIM_Base_Start_IT(&htim1);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -385,32 +391,54 @@ int main(void)
 	  HAL_Delay(1000);
 //	  TxData[7] = TxData[7] + 1;
 
-	    HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+//	    HAL_GPIO_TogglePin(GPIOC, LED_Pin);
 		char tmp_string[100];
 		u8g2_FirstPage(&u8g2);
 		do
 		 {
-//			tempUInt = (uint32_t)(pressure/10000);
-//		    tempDec = (uint16_t)(pressure%10000);
-//		    sprintf(tmp_string, "P %d,%lu hPa", tempUInt, tempDec);
-//			u8g2_DrawStr(&u8g2, 0, 15, tmp_string);
-		    tempInt = (int16_t)(temperature/100);
-		    tempDec = (uint16_t)(temperature%100);
-		    sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
+			//////t1
+			if(temperature1timeout == DATA_WAIT_TIMEOUT){
+			    sprintf(tmp_string, "T xxx");
+			}else{
+				tempInt = (int16_t)(temperature/100);
+				tempDec = (uint16_t)(temperature%100);
+				sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
+			}
 			u8g2_DrawStr(&u8g2, 0, 20, tmp_string);
-			tempUInt = (uint32_t)(humidity/1024);
-		    tempDec = (uint16_t)(humidity%1024);
-		    sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
+
+
+			//////h1
+			if(humidity1timeout == DATA_WAIT_TIMEOUT){
+			    sprintf(tmp_string, "H xxx");
+			}else{
+				tempUInt = (uint32_t)(humidity/1024);
+				tempDec = (uint16_t)(humidity%1024);
+				sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
+			}
 			u8g2_DrawStr(&u8g2, 0, 45, tmp_string);
 
-			tempInt = (int16_t)(temperature/100);
-		    tempDec = (uint16_t)(temperature%100);
-		    sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
+			//////t2
+			if(temperature2timeout == DATA_WAIT_TIMEOUT){
+			    sprintf(tmp_string, "T xxx");
+			}else{
+				tempInt = (int16_t)(temperature/100);
+				tempDec = (uint16_t)(temperature%100);
+				sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
+			}
 			u8g2_DrawStr(&u8g2, 0, 80, tmp_string);
-			tempUInt = (uint32_t)(humidity/1024);
-		    tempDec = (uint16_t)(humidity%1024);
-		    sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
+
+
+
+			//////h2
+			if(humidity2timeout == DATA_WAIT_TIMEOUT){
+			    sprintf(tmp_string, "H xxx");
+			}else{
+				tempUInt = (uint32_t)(humidity/1024);
+				tempDec = (uint16_t)(humidity%1024);
+				sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
+			}
 			u8g2_DrawStr(&u8g2, 0, 105, tmp_string);
+
 		 } while (u8g2_NextPage(&u8g2));
 
 
@@ -627,7 +655,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan_)
 {
-	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+//	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
 }
 
 
@@ -635,7 +663,7 @@ void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan_)
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 {
 	HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData);
-	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+	//HAL_GPIO_TogglePin(GPIOC, LED_Pin);
 
 	 uint32_t u;
 	  u = RxData[0];
@@ -643,12 +671,19 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 	  u += (uint32_t)(RxData[2] << 16);
 	  u += (uint32_t)(RxData[3] << 24);
 
+
+
+
 	if(RxHeader.StdId==0xf0){
 		pressure = u;
 	}else if(RxHeader.StdId==0xf0+1){
 		temperature = u;
+		temperature1timeout = 0;
+		temperature2timeout = 0;
 	}else if(RxHeader.StdId==0xf0+2){
 		humidity = u;
+		humidity1timeout = 0;
+		humidity2timeout = 0;
 	}
 }
 /* USER CODE END 4 */
@@ -681,5 +716,36 @@ void assert_failed(uint8_t *file, uint32_t line)
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
+
+
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if( htim->Instance == TIM1 ){
+	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+	++temperature1timeout;
+	++temperature2timeout;
+	++humidity1timeout;
+	++humidity2timeout;
+
+	if(temperature1timeout>= DATA_WAIT_TIMEOUT){
+		temperature1timeout = DATA_WAIT_TIMEOUT;
+	}
+
+	if(temperature2timeout>= DATA_WAIT_TIMEOUT){
+		temperature2timeout = DATA_WAIT_TIMEOUT;
+	}
+
+	if(humidity1timeout>= DATA_WAIT_TIMEOUT){
+		humidity1timeout = DATA_WAIT_TIMEOUT;
+	}
+
+	if(humidity2timeout>= DATA_WAIT_TIMEOUT){
+		humidity2timeout = DATA_WAIT_TIMEOUT;
+	}
+
+ }
+}
+
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
