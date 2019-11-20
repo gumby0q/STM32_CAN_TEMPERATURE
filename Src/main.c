@@ -63,7 +63,7 @@ volatile uint8_t temperature2timeout = 0;
 volatile uint8_t humidity1timeout = 0;
 volatile uint8_t humidity2timeout = 0;
 
-#define DATA_WAIT_TIMEOUT 100
+#define DATA_WAIT_TIMEOUT 10
 
 CAN_FilterTypeDef sFilterConfig;
 CAN_TxHeaderTypeDef TxHeader;
@@ -685,6 +685,34 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 		humidity1timeout = 0;
 		humidity2timeout = 0;
 	}
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if( htim->Instance == TIM1 ){
+	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+	++temperature1timeout;
+	++temperature2timeout;
+	++humidity1timeout;
+	++humidity2timeout;
+
+	if(temperature1timeout>= DATA_WAIT_TIMEOUT){
+		temperature1timeout = DATA_WAIT_TIMEOUT;
+	}
+
+	if(temperature2timeout>= DATA_WAIT_TIMEOUT){
+		temperature2timeout = DATA_WAIT_TIMEOUT;
+	}
+
+	if(humidity1timeout>= DATA_WAIT_TIMEOUT){
+		humidity1timeout = DATA_WAIT_TIMEOUT;
+	}
+
+	if(humidity2timeout>= DATA_WAIT_TIMEOUT){
+		humidity2timeout = DATA_WAIT_TIMEOUT;
+	}
+
+ }
 }
 /* USER CODE END 4 */
 
