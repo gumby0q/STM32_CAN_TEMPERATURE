@@ -27,6 +27,9 @@
 #include "bme280.h"
 #include "u8g2.h"
 #include <stdio.h>
+
+#include "OneWire.h"
+#include "DallasTemperature.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,6 +53,11 @@ CAN_HandleTypeDef hcan;
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim1;
+
+UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart3;
+DMA_HandleTypeDef hdma_usart1_rx;
+DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 static u8g2_t u8g2;
@@ -80,16 +88,33 @@ struct bme280_data comp_data;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_CAN_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_USART1_UART_Init(void);
+static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
+// function to print a device address
+void printAddress(CurrentDeviceAddress deviceAddress)
+{
+  for (uint8_t i = 0; i < 8; i++)
+  {
+ char buf[4];
+ sprintf(buf, "%02X ", deviceAddress[i]);
+// printf(buf);
+	HAL_UART_Transmit(&huart3, buf, sizeof(buf), 50);
+
+  }
+}
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+
+/* ******************************************************************************* */
 struct bme280_dev dev;
 
 int8_t setup_bme280(void);
@@ -300,9 +325,12 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_CAN_Init();
   MX_SPI1_Init();
   MX_TIM1_Init();
+  MX_USART1_UART_Init();
+  MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
 
 
@@ -361,6 +389,89 @@ int main(void)
   u8g2_SetPowerSave(&u8g2, 0);
   int8_t rslt;
   HAL_TIM_Base_Start_IT(&htim1);
+
+
+
+
+
+
+
+
+
+
+
+
+
+//	printf("Debug UART is OK!\r\n");
+
+	if(OW_Reset() == OW_OK)
+	{
+//	printf("OneWire devices are present :)\r\n");
+	}
+	else
+	{
+//	printf("OneWire no devices :(\r\n");
+	}
+
+	// arrays to hold device address
+	CurrentDeviceAddress insideThermometer;
+	uint8_t test_test = 0xff;
+	HAL_UART_Transmit(&huart3, &test_test, sizeof(1), 50);
+
+	// locate devices on the bus
+//	printf("Locating devices...");
+	DT_Begin();
+//	printf("Found ");
+	char buf[8];
+	sprintf(buf, "%d", DT_GetDeviceCount());
+	HAL_UART_Transmit(&huart3, buf, 8, 50);
+	HAL_UART_Transmit(&huart3, &test_test, 1, 50);
+
+//	printf(buf);
+
+//	printf(" devices.\r\n");
+
+	// report parasite power requirements
+//	printf("Parasite power is: ");
+	if (DT_IsParasitePowerMode()) {
+//		printf("ON\r\n");
+	} else {
+//		printf("OFF\r\n");
+	}
+
+
+	if (!DT_GetAddress(insideThermometer, 0)) {
+
+	}
+//		printf("Unable to find address for Device 0\r\n");
+
+//	printf("Device 0 Address: ");
+	printAddress(insideThermometer);
+//	printf("\r\n");
+
+	// set the resolution to 12 bit (Each Dallas/Maxim device is capable of several different resolutions)
+//	DT_SetResolution(insideThermometer, 12, true);
+
+//	printf("Device 0 Resolution: ");
+//	sprintf(buf, "%d", DT_GetResolution(insideThermometer));
+//	printf(buf);
+//	printf("\r\n");
+//	HAL_UART_Transmit(&huart3, buf, sizeof(buf), 50);
+
+
+//	if (!DT_GetAddress(insideThermometer, 1)) {
+//		printf("Unable to find address for Device 1\r\n");
+//	}
+
+//	printf("Device 1 Address: ");
+//	printAddress(insideThermometer);
+//	printf("\r\n");
+	// set the resolution to 12 bit (Each Dallas/Maxim device is capable of several different resolutions)
+//	DT_SetResolution(insideThermometer, 12, true);
+//	sprintf(buf, "%d", DT_GetResolution(insideThermometer));
+//	HAL_UART_Transmit(&huart3, buf, sizeof(buf), 50);
+
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -388,6 +499,9 @@ int main(void)
 //	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
 //	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+	  uint8_t test_uart_data[2] = { 1, 8 };
+	  HAL_UART_Transmit(&huart3, test_uart_data, sizeof(test_uart_data), 50);
+
 	  HAL_Delay(1000);
 //	  TxData[7] = TxData[7] + 1;
 
@@ -602,6 +716,91 @@ static void MX_TIM1_Init(void)
   /* USER CODE BEGIN TIM1_Init 2 */
 
   /* USER CODE END TIM1_Init 2 */
+
+}
+
+/**
+  * @brief USART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART1_Init 0 */
+
+  /* USER CODE END USART1_Init 0 */
+
+  /* USER CODE BEGIN USART1_Init 1 */
+
+  /* USER CODE END USART1_Init 1 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_HalfDuplex_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+
+  /* USER CODE END USART1_Init 2 */
+
+}
+
+/**
+  * @brief USART3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_USART3_UART_Init(void)
+{
+
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 115200;
+  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+
+}
+
+/** 
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void) 
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Channel4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
+  /* DMA1_Channel5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 
 }
 
