@@ -96,6 +96,12 @@ static void MX_USART1_UART_Init(void);
 static void MX_USART3_UART_Init(void);
 /* USER CODE BEGIN PFP */
 
+int _write(int file, char *ptr, int len)
+{
+ HAL_UART_Transmit(&huart3, (uint8_t *) ptr, len, HAL_MAX_DELAY);
+ return len;
+}
+
 // function to print a device address
 void printAddress(CurrentDeviceAddress deviceAddress)
 {
@@ -103,9 +109,7 @@ void printAddress(CurrentDeviceAddress deviceAddress)
   {
  char buf[4];
  sprintf(buf, "%02X ", deviceAddress[i]);
-// printf(buf);
-	HAL_UART_Transmit(&huart3, buf, sizeof(buf), 50);
-
+ printf(buf);
   }
 }
 /* USER CODE END PFP */
@@ -391,86 +395,47 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim1);
 
 
-
-
-
-
-
-
-
-
-
-
-
-//	printf("Debug UART is OK!\r\n");
+	printf("Debug UART is OK!\r\n");
 
 	if(OW_Reset() == OW_OK)
 	{
-//	printf("OneWire devices are present :)\r\n");
+		printf("OneWire devices are present :)\r\n");
 	}
 	else
 	{
-//	printf("OneWire no devices :(\r\n");
+		printf("OneWire no devices :(\r\n");
 	}
 
 	// arrays to hold device address
 	CurrentDeviceAddress insideThermometer;
-	uint8_t test_test = 0xff;
-	HAL_UART_Transmit(&huart3, &test_test, sizeof(1), 50);
 
 	// locate devices on the bus
-//	printf("Locating devices...");
+	printf("Locating devices...");
 	DT_Begin();
-//	printf("Found ");
+	printf("Found ");
 	char buf[8];
 	sprintf(buf, "%d", DT_GetDeviceCount());
-	HAL_UART_Transmit(&huart3, buf, 8, 50);
-	HAL_UART_Transmit(&huart3, &test_test, 1, 50);
-
-//	printf(buf);
-
-//	printf(" devices.\r\n");
+	printf(buf);
+	printf(" devices.\r\n");
 
 	// report parasite power requirements
-//	printf("Parasite power is: ");
-	if (DT_IsParasitePowerMode()) {
-//		printf("ON\r\n");
-	} else {
-//		printf("OFF\r\n");
-	}
+	printf("Parasite power is: ");
+	if (DT_IsParasitePowerMode()) printf("ON\r\n");
+	else printf("OFF\r\n");
 
+	if (!DT_GetAddress(insideThermometer, 0)) printf("Unable to find address for Device 0\r\n");
 
-	if (!DT_GetAddress(insideThermometer, 0)) {
-
-	}
-//		printf("Unable to find address for Device 0\r\n");
-
-//	printf("Device 0 Address: ");
+	printf("Device 0 Address: ");
 	printAddress(insideThermometer);
-//	printf("\r\n");
+	printf("\r\n");
 
 	// set the resolution to 12 bit (Each Dallas/Maxim device is capable of several different resolutions)
-//	DT_SetResolution(insideThermometer, 12, true);
+	DT_SetResolution(insideThermometer, 12, true);
 
-//	printf("Device 0 Resolution: ");
-//	sprintf(buf, "%d", DT_GetResolution(insideThermometer));
-//	printf(buf);
-//	printf("\r\n");
-//	HAL_UART_Transmit(&huart3, buf, sizeof(buf), 50);
-
-
-//	if (!DT_GetAddress(insideThermometer, 1)) {
-//		printf("Unable to find address for Device 1\r\n");
-//	}
-
-//	printf("Device 1 Address: ");
-//	printAddress(insideThermometer);
-//	printf("\r\n");
-	// set the resolution to 12 bit (Each Dallas/Maxim device is capable of several different resolutions)
-//	DT_SetResolution(insideThermometer, 12, true);
-//	sprintf(buf, "%d", DT_GetResolution(insideThermometer));
-//	HAL_UART_Transmit(&huart3, buf, sizeof(buf), 50);
-
+	printf("Device 0 Resolution: ");
+	sprintf(buf, "%d", DT_GetResolution(insideThermometer));
+	printf(buf);
+	printf("\r\n");
 
   /* USER CODE END 2 */
 
@@ -495,10 +460,22 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+	  // call sensors.requestTemperatures() to issue a global temperature
+	  // request to all devices on the bus
+	  printf("Requesting temperatures...");
+	  DT_RequestTemperatures(); // Send the command to get temperatures
+	  printf("DONE\r\n");
+	  // After we got the temperatures, we can print them here.
+	  // We use the function ByIndex, and as an example get the temperature from the first sensor only.
+	  printf("Temperature for the device 1 (index 0) is: ");
+	  sprintf(buf, "%.2f\r\n", DT_GetTempCByIndex(0));
+	  printf(buf);
+	  HAL_Delay(2000);
+
 //	  struct bme280_data comp_data;
 //	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
-//	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+
 	  uint8_t test_uart_data[2] = { 1, 8 };
 	  HAL_UART_Transmit(&huart3, test_uart_data, sizeof(test_uart_data), 50);
 
