@@ -505,8 +505,10 @@ int main(void)
 				tempUInt = (uint32_t)(humidity/1024);
 				tempDec = (uint16_t)(humidity%1024);
 				sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
+				printf(tmp_string);
 			}
 			u8g2_DrawStr(&u8g2, 0, 45, tmp_string);
+
 
 			//////t2
 			if(temperature2timeout == DATA_WAIT_TIMEOUT){
@@ -519,20 +521,16 @@ int main(void)
 			u8g2_DrawStr(&u8g2, 0, 80, tmp_string);
 
 
-
 			//////h2
 			if(humidity2timeout == DATA_WAIT_TIMEOUT){
 			    sprintf(tmp_string, "H xxx");
 			}else{
 				tempUInt = (uint32_t)(humidity/1024);
 				tempDec = (uint16_t)(humidity%1024);
-				sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
 			}
 			u8g2_DrawStr(&u8g2, 0, 105, tmp_string);
 
 		 } while (u8g2_NextPage(&u8g2));
-
-
 
   }
   /* USER CODE END 3 */
