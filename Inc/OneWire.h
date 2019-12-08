@@ -1,7 +1,7 @@
 /*
  * OneWire.h
  *
- *  Created on: 18 квіт. 2019 р.
+ *  Created on: 18 пїЅпїЅпїЅ. 2019 пїЅ.
  *      Author: Andriy Honcharenko
  */
 
@@ -48,6 +48,7 @@ extern UART_HandleTypeDef 	HUARTx;
 #define OW_OK				1
 #define OW_ERROR			2
 #define OW_NO_DEVICE		3
+#define OW_TIMEOUT			4
 
 #define OW_NO_READ			0xff
 #define OW_READ_SLOT		0xff

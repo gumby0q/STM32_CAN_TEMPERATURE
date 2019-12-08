@@ -391,7 +391,7 @@ int main(void)
       u8x8_stm32_gpio_and_delay);
   u8g2_InitDisplay(&u8g2);
   u8g2_SetPowerSave(&u8g2, 0);
-  int8_t rslt;
+//  int8_t rslt;
   HAL_TIM_Base_Start_IT(&htim1);
 
 
@@ -442,6 +442,9 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	char tmp_string[20];
+
+	memset(tmp_string, 0, 20);
+
     u8g2_FirstPage(&u8g2);
     do
 	 {
@@ -493,7 +496,7 @@ int main(void)
 			}else{
 				tempInt = (int16_t)(temperature/100);
 				tempDec = (uint16_t)(temperature%100);
-				sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
+				sprintf(tmp_string, "T %d,%u", tempInt, tempDec);
 			}
 			u8g2_DrawStr(&u8g2, 0, 20, tmp_string);
 
@@ -504,7 +507,7 @@ int main(void)
 			}else{
 				tempUInt = (uint32_t)(humidity/1024);
 				tempDec = (uint16_t)(humidity%1024);
-				sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
+				sprintf(tmp_string, "H %lu,%u", tempUInt, tempDec);
 				printf(tmp_string);
 			}
 			u8g2_DrawStr(&u8g2, 0, 45, tmp_string);
@@ -516,7 +519,7 @@ int main(void)
 			}else{
 				tempInt = (int16_t)(temperature/100);
 				tempDec = (uint16_t)(temperature%100);
-				sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
+				sprintf(tmp_string, "T %u,%u", tempInt, tempDec);
 			}
 			u8g2_DrawStr(&u8g2, 0, 80, tmp_string);
 

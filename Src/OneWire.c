@@ -1,7 +1,7 @@
 /*
  * OneWire.c
  *
- *  Created on: 18 квіт. 2019 р.
+ *  Created on: 18 пїЅпїЅпїЅ. 2019 пїЅ.
  *      Author: Andriy Honcharenko
  */
 
@@ -12,6 +12,8 @@
 #define OW_R_1	0xff
 
 uint8_t ow_buf[8];
+
+#define TIMEOUT_MS (250)
 
 static void OW_toBits(uint8_t ow_byte, uint8_t *ow_bits);
 static uint8_t OW_toByte(uint8_t *ow_bits);
@@ -53,6 +55,26 @@ static uint8_t OW_toByte(uint8_t *ow_bits)
 	return ow_byte;
 }
 
+static uint8_t SetFlagTimeout(uint32_t flag, uint32_t Timeout)
+{
+	uint8_t OW_Flag = 0;
+	uint32_t Tickstart = 0U;
+	Tickstart = HAL_GetTick();
+	while (HAL_UART_GetState(&HUARTx) != flag)
+	{
+		if (Timeout != HAL_MAX_DELAY)
+		{
+			if ((Timeout == 0U) || ((HAL_GetTick() - Tickstart) > Timeout))
+			{
+				OW_Flag = OW_TIMEOUT;
+				break;
+			}
+		}
+		//__NOP();
+	}
+	return OW_Flag;
+}
+
 static void OW_SendBits(uint8_t num_bits)
 {
 	HAL_UART_Transmit_DMA(&HUARTx, ow_buf, num_bits);
@@ -88,9 +110,9 @@ uint8_t OW_Reset(void)
 	HAL_UART_Receive_DMA(&HUARTx, &ow_presence, 1);
 
 	/*## Wait for the end of the transfer ###################################*/
-	while (HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY)
+	if(SetFlagTimeout(HAL_UART_STATE_READY, TIMEOUT_MS) == OW_TIMEOUT)
 	{
-		__NOP();
+		return OW_TIMEOUT;
 	}
 
 	OW_UART_Init(115200);
