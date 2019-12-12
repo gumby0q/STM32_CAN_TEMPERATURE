@@ -505,8 +505,8 @@ int main(void)
 				tempUInt = (uint32_t)(humidity/1024);
 				tempDec = (uint16_t)(humidity%1024);
 				sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
-				printf(tmp_string);
 			}
+			printf(tmp_string);
 			u8g2_DrawStr(&u8g2, 0, 45, tmp_string);
 
 
@@ -517,6 +517,7 @@ int main(void)
 				tempInt = (int16_t)(temperature/100);
 				tempDec = (uint16_t)(temperature%100);
 				sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
+				printf(tmp_string);
 			}
 			u8g2_DrawStr(&u8g2, 0, 80, tmp_string);
 
