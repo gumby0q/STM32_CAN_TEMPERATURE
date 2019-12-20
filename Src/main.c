@@ -395,25 +395,34 @@ int main(void)
   HAL_TIM_Base_Start_IT(&htim1);
 
 
-	printf("Debug UART is OK!\r\n");
 
-	if(OW_Reset() == OW_OK)
-	{
-		printf("OneWire devices are present :)\r\n");
-	}
-	else
-	{
-		printf("OneWire no devices :(\r\n");
-	}
+  	 uint8_t ds_error = 0;
+
+  	 printf("Debug UART is OK!\r\n");
+
+//	if(OW_Reset() == OW_OK)
+//	{
+//		printf("OneWire devices are present :)\r\n");
+//	}
+//	else
+//	{
+//		printf("OneWire no devices :(\r\n");
+//	}
 
 	// arrays to hold device address
 	CurrentDeviceAddress insideThermometer;
 
 	// locate devices on the bus
+	char buf[30];
+
 	printf("Locating devices...");
-	DT_Begin();
+	ds_error = DT_Begin();
+	if (ds_error != DS_OK) {
+		sprintf(buf, "DT_Begin err %d", ds_error);
+		printf(buf);
+	}
+
 	printf("Found ");
-	char buf[8];
 	sprintf(buf, "%d", DT_GetDeviceCount());
 	printf(buf);
 	printf(" devices.\r\n");

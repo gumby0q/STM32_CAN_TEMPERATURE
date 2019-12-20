@@ -1,11 +1,13 @@
 /*
  * DallasTemperature.c
  *
- *  Created on: 21 êâ³ò. 2019 ð.
+ *  Created on: 21 ï¿½ï¿½ï¿½. 2019 ï¿½.
  *      Author: Andriy
  */
 
 #include "DallasTemperature.h"
+#include <stdio.h>
+
 
 // OneWire commands
 #define STARTCONVO      0x44  // Tells device to take a temperature reading and put it on the scratchpad
@@ -80,7 +82,7 @@ bool DT_ValidFamily(const uint8_t* deviceAddress)
 }
 
 // initialise the bus
-void DT_Begin(void)
+uint8_t DT_Begin(void)
 {
 
 	AllDeviceAddress deviceAddress;
@@ -88,7 +90,18 @@ void DT_Begin(void)
 	devices = 0; 	// Reset the number of devices when we enumerate wire devices
 	ds18Count = 0; 	// Reset number of DS18xxx Family devices
 
-	devices = OW_Search(deviceAddress, ONEWIRE_MAX_DEVICES);
+	uint8_t error_status = 0;
+
+//	devices = OW_Search(deviceAddress, ONEWIRE_MAX_DEVICES);
+	error_status = OW_Search(deviceAddress, ONEWIRE_MAX_DEVICES, &devices);
+
+	char buf[18];
+	sprintf(buf, "\r\n r %d\r\n", error_status);
+	printf(buf);
+
+	if (error_status != 0) {
+		return error_status;
+	}
 
 	for(uint8_t i = 0; i < devices; i++)
 	{
@@ -106,6 +119,12 @@ void DT_Begin(void)
 			}
 		}
 	}
+
+	if (ds18Count == 0) {
+		return DS_NO_DS18_DEVICES;
+	}
+
+	return DS_OK;
 }
 
 // returns the number of devices found on the bus
@@ -133,7 +152,17 @@ bool DT_GetAddress(uint8_t* currentDeviceAddress, uint8_t index)
 
 	uint8_t depth = 0;
 
-	depth = OW_Search(deviceAddress, ONEWIRE_MAX_DEVICES);
+	uint8_t error_status = 0;
+
+//	depth = OW_Search(deviceAddress, ONEWIRE_MAX_DEVICES);
+	error_status = OW_Search(deviceAddress, ONEWIRE_MAX_DEVICES, &depth);
+
+	char buf[18];
+	sprintf(buf, "\r\n r2 %d %d\r\n", error_status, depth);
+	printf(buf);
+	if (error_status != 0) {
+		return error_status;
+	}
 
 	if(index < depth && DT_ValidAddress(&deviceAddress[index * 8]))
 	{
@@ -142,7 +171,6 @@ bool DT_GetAddress(uint8_t* currentDeviceAddress, uint8_t index)
 	}
 
 	return false;
-
 }
 
 // attempt to determine if the device at the given address is connected to the bus
@@ -164,7 +192,7 @@ bool DT_ReadScratchPad(const uint8_t* deviceAddress, uint8_t* scratchPad)
 {
 	// send the reset command and fail fast
 	int b = OW_Reset();
-	if (b == 0)
+	if (b != 0)
 		return false;
 
 	uint8_t query[18]={0x55, 0, 0, 0, 0, 0, 0, 0, 0, READSCRATCH, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
@@ -498,14 +526,14 @@ int16_t DT_CalculateTemperature(const uint8_t* deviceAddress, uint8_t* scratchPa
 	 DS1820 and DS18S20 have a 9-bit temperature register.
 
 	 Resolutions greater than 9-bit can be calculated using the data from
-	 the temperature, and COUNT REMAIN and COUNT PER °C registers in the
+	 the temperature, and COUNT REMAIN and COUNT PER ï¿½C registers in the
 	 scratchpad.  The resolution of the calculation depends on the model.
 
-	 While the COUNT PER °C register is hard-wired to 16 (10h) in a
+	 While the COUNT PER ï¿½C register is hard-wired to 16 (10h) in a
 	 DS18S20, it changes with temperature in DS1820.
 
 	 After reading the scratchpad, the TEMP_READ value is obtained by
-	 truncating the 0.5°C bit (bit 0) from the temperature data. The
+	 truncating the 0.5ï¿½C bit (bit 0) from the temperature data. The
 	 extended resolution temperature can then be calculated using the
 	 following equation:
 
