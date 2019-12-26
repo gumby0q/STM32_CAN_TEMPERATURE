@@ -1,8 +1,6 @@
 /*
  * DallasTemperature.h
  *
- *  Created on: 21 квіт. 2019 р.
- *      Author: Andriy
  */
 
 #ifndef DALLASTEMPERATURE_H_
@@ -18,6 +16,9 @@
 #define DS28EA00MODEL 	0x42
 
 // Error Codes
+#define DS_OK					0
+#define DS_NO_DS18_DEVICES 		1
+
 #define DEVICE_DISCONNECTED_C 	-127
 #define DEVICE_DISCONNECTED_F 	-196.6
 #define DEVICE_DISCONNECTED_RAW -7040
@@ -30,7 +31,7 @@ typedef uint8_t CurrentDeviceAddress[8];
 #define constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
 
 // initialise bus
-void DT_Begin(void);
+uint8_t DT_Begin(void);
 
 // returns the number of devices found on the bus
 uint8_t DT_GetDeviceCount(void);

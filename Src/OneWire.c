@@ -1,8 +1,6 @@
 /*
  * OneWire.c
  *
- *  Created on: 18 квіт. 2019 р.
- *      Author: Andriy Honcharenko
  */
 
 #include <OneWire.h>
@@ -12,6 +10,12 @@
 #define OW_R_1	0xff
 
 uint8_t ow_buf[8];
+
+//#define TIMEOUT_MS (250)
+#define OW_RESET_TIMEOUT_VALUE (0x00000100U)
+#define OW_DATA_SEND_TIMEOUT_VALUE  (0x00001000U)
+#define OW_DATA_SEND_BITS_TIMEOUT_VALUE (0x00001100U)
+
 
 static void OW_toBits(uint8_t ow_byte, uint8_t *ow_bits);
 static uint8_t OW_toByte(uint8_t *ow_bits);
@@ -53,15 +57,29 @@ static uint8_t OW_toByte(uint8_t *ow_bits)
 	return ow_byte;
 }
 
-static void OW_SendBits(uint8_t num_bits)
+
+static uint8_t OW_SendBits(uint8_t num_bits)
 {
 	HAL_UART_Transmit_DMA(&HUARTx, ow_buf, num_bits);
 	HAL_UART_Receive_DMA(&HUARTx, ow_buf, num_bits);
 
-	while (HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY)
-	{
-		__NOP();
-	}
+//	while (HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY)
+//	{
+//		__NOP();
+//	}
+
+		uint32_t tickstart = 0U;
+		tickstart = HAL_GetTick();
+
+		while(HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY) {
+			if ((HAL_GetTick() - tickstart) > OW_DATA_SEND_BITS_TIMEOUT_VALUE)
+			{
+//				return 0;
+				return OW_TIMEOUT;
+			}
+		}
+
+		return 0;
 }
 
 static HAL_StatusTypeDef OW_UART_Init(uint32_t baudRate)
@@ -87,10 +105,15 @@ uint8_t OW_Reset(void)
 	HAL_UART_Transmit(&HUARTx, &ow_presence, 1, HAL_MAX_DELAY);
 	HAL_UART_Receive_DMA(&HUARTx, &ow_presence, 1);
 
-	/*## Wait for the end of the transfer ###################################*/
-	while (HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY)
-	{
-		__NOP();
+	uint32_t tickstart = 0U;
+	tickstart = HAL_GetTick();
+
+	while(HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY) {
+		if ((HAL_GetTick() - tickstart) > OW_RESET_TIMEOUT_VALUE)
+		{
+
+		  return OW_TIMEOUT;
+		}
 	}
 
 	OW_UART_Init(115200);
@@ -110,17 +133,18 @@ HAL_StatusTypeDef OW_Init(void)
 
 uint8_t OW_Send(uint8_t sendReset, uint8_t *command, uint8_t cLen, uint8_t *data, uint8_t dLen, uint8_t readStart)
 {
+	uint8_t error = 0;
 	if (sendReset == OW_SEND_RESET)
 	{
-		if (OW_Reset() == OW_NO_DEVICE)
+		error = OW_Reset();
+		if (error != 0)
 		{
-			return OW_NO_DEVICE;
+			return error;
 		}
 	}
 
 	while (cLen > 0)
 	{
-
 		OW_toBits(*command, ow_buf);
 		command++;
 		cLen--;
@@ -128,9 +152,14 @@ uint8_t OW_Send(uint8_t sendReset, uint8_t *command, uint8_t cLen, uint8_t *data
 		HAL_UART_Transmit_DMA(&HUARTx, ow_buf, sizeof(ow_buf));
 		HAL_UART_Receive_DMA(&HUARTx, ow_buf, sizeof(ow_buf));
 
-		while (HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY)
-		{
-			__NOP();
+		uint32_t tickstart = 0U;
+		tickstart = HAL_GetTick();
+
+		while(HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY) {
+			if ((HAL_GetTick() - tickstart) > OW_DATA_SEND_TIMEOUT_VALUE)
+			{
+				return OW_TIMEOUT;
+			}
 		}
 
 		if (readStart == 0 && dLen > 0)
@@ -153,33 +182,44 @@ uint8_t OW_Send(uint8_t sendReset, uint8_t *command, uint8_t cLen, uint8_t *data
 
 #if ONEWIRE_SEARCH
 
-uint8_t OW_Search(uint8_t *buf, uint8_t num)
+uint8_t OW_Search(uint8_t *buf, uint8_t num, uint8_t *found)
 {
 
-	uint8_t found = 0;
+	uint8_t error_status = 0;
+
+	*found = 0;
 	uint8_t *lastDevice = NULL;
 	uint8_t *curDevice = buf;
 	uint8_t numBit, lastCollision, currentCollision, currentSelection;
 
 	lastCollision = 0;
 
-	while (found < num)
+	while (*found < num)
 	{
 		numBit = 1;
 		currentCollision = 0;
 
-		OW_Send(OW_SEND_RESET, (uint8_t*)"\xf0", 1, NULL, 0, OW_NO_READ);
+		error_status = OW_Send(OW_SEND_RESET, (uint8_t*)"\xf0", 1, NULL, 0, OW_NO_READ);
+
+		if (error_status != 0) {
+			return error_status;
+		}
 
 		for (numBit = 1; numBit <= 64; numBit++)
 		{
 			OW_toBits(OW_READ_SLOT, ow_buf);
-			OW_SendBits(2);
+
+			error_status = OW_SendBits(2);
+
+			if (error_status != 0) {
+				return error_status;
+			}
 
 			if (ow_buf[0] == OW_R_1)
 			{
 				if (ow_buf[1] == OW_R_1)
 				{
-					return found;
+					return 0;
 				}
 				else
 				{
@@ -240,21 +280,27 @@ uint8_t OW_Search(uint8_t *buf, uint8_t num)
 				OW_toBits(0x00, ow_buf);
 			}
 
-			OW_SendBits(1);
+			error_status = OW_SendBits(1);
+
+			if (error_status != 0) {
+				return error_status;
+			}
 		}
 
-		found++;
+		*found = *found + 1;
+
 		lastDevice = curDevice;
 		curDevice += 8;
 		if (currentCollision == 0)
 		{
-			return found;
+
+			return 0;
 		}
 
 		lastCollision = currentCollision;
 	}
 
-        return found;
+	return 0;
 }
 
 #endif

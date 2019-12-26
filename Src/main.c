@@ -391,29 +391,38 @@ int main(void)
       u8x8_stm32_gpio_and_delay);
   u8g2_InitDisplay(&u8g2);
   u8g2_SetPowerSave(&u8g2, 0);
-  int8_t rslt;
+//  int8_t rslt;
   HAL_TIM_Base_Start_IT(&htim1);
 
 
-	printf("Debug UART is OK!\r\n");
 
-	if(OW_Reset() == OW_OK)
-	{
-		printf("OneWire devices are present :)\r\n");
-	}
-	else
-	{
-		printf("OneWire no devices :(\r\n");
-	}
+  	 uint8_t ds_error = 0;
+
+  	 printf("Debug UART is OK!\r\n");
+
+//	if(OW_Reset() == OW_OK)
+//	{
+//		printf("OneWire devices are present :)\r\n");
+//	}
+//	else
+//	{
+//		printf("OneWire no devices :(\r\n");
+//	}
 
 	// arrays to hold device address
 	CurrentDeviceAddress insideThermometer;
 
 	// locate devices on the bus
+	char buf[30];
+
 	printf("Locating devices...");
-	DT_Begin();
+	ds_error = DT_Begin();
+	if (ds_error != DS_OK) {
+		sprintf(buf, "DT_Begin err %d", ds_error);
+		printf(buf);
+	}
+
 	printf("Found ");
-	char buf[8];
 	sprintf(buf, "%d", DT_GetDeviceCount());
 	printf(buf);
 	printf(" devices.\r\n");
@@ -442,6 +451,9 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	char tmp_string[20];
+
+	memset(tmp_string, 0, 20);
+
     u8g2_FirstPage(&u8g2);
     do
 	 {
@@ -459,7 +471,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
 	  // call sensors.requestTemperatures() to issue a global temperature
 	  // request to all devices on the bus
 	  printf("Requesting temperatures...");
@@ -471,7 +482,6 @@ int main(void)
 	  sprintf(buf, "%.2f\r\n", DT_GetTempCByIndex(0));
 	  printf(buf);
 	  HAL_Delay(2000);
-
 //	  struct bme280_data comp_data;
 //	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
@@ -493,7 +503,7 @@ int main(void)
 			}else{
 				tempInt = (int16_t)(temperature/100);
 				tempDec = (uint16_t)(temperature%100);
-				sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
+				sprintf(tmp_string, "T %d,%u", tempInt, tempDec);
 			}
 			u8g2_DrawStr(&u8g2, 0, 20, tmp_string);
 
@@ -504,9 +514,9 @@ int main(void)
 			}else{
 				tempUInt = (uint32_t)(humidity/1024);
 				tempDec = (uint16_t)(humidity%1024);
-				sprintf(tmp_string, "H %d,%lu", tempUInt, tempDec);
+				sprintf(tmp_string, "H %lu,%u", tempUInt, tempDec);
+				printf(tmp_string);
 			}
-			printf(tmp_string);
 			u8g2_DrawStr(&u8g2, 0, 45, tmp_string);
 
 
@@ -516,8 +526,7 @@ int main(void)
 			}else{
 				tempInt = (int16_t)(temperature/100);
 				tempDec = (uint16_t)(temperature%100);
-				sprintf(tmp_string, "T %d,%lu", tempInt, tempDec);
-				printf(tmp_string);
+				sprintf(tmp_string, "T %u,%u", tempInt, tempDec);
 			}
 			u8g2_DrawStr(&u8g2, 0, 80, tmp_string);
 
@@ -532,7 +541,6 @@ int main(void)
 			u8g2_DrawStr(&u8g2, 0, 105, tmp_string);
 
 		 } while (u8g2_NextPage(&u8g2));
-
   }
   /* USER CODE END 3 */
 }
