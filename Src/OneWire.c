@@ -1,8 +1,6 @@
 /*
  * OneWire.c
  *
- *  Created on: 18 ���. 2019 �.
- *      Author: Andriy Honcharenko
  */
 
 #include <OneWire.h>
@@ -107,28 +105,6 @@ uint8_t OW_Reset(void)
 	HAL_UART_Transmit(&HUARTx, &ow_presence, 1, HAL_MAX_DELAY);
 	HAL_UART_Receive_DMA(&HUARTx, &ow_presence, 1);
 
-
-
-//			static uint8_t SetFlagTimeout(uint32_t flag, uint32_t Timeout)
-//			{
-//				uint8_t OW_Flag = 0;
-//				uint32_t Tickstart = 0U;
-//				Tickstart = HAL_GetTick();
-//				while (HAL_UART_GetState(&HUARTx) != flag)
-//				{
-//					if (Timeout != HAL_MAX_DELAY)
-//					{
-//						if ((Timeout == 0U) || ((HAL_GetTick() - Tickstart) > Timeout))
-//						{
-//							OW_Flag = OW_TIMEOUT;
-//							break;
-//						}
-//					}
-//					//__NOP();
-//				}
-//				return OW_Flag;
-//			}
-
 	uint32_t tickstart = 0U;
 	tickstart = HAL_GetTick();
 
@@ -139,12 +115,6 @@ uint8_t OW_Reset(void)
 		  return OW_TIMEOUT;
 		}
 	}
-
-	/*## Wait for the end of the transfer ###################################*/
-//	if(SetFlagTimeout(HAL_UART_STATE_READY, TIMEOUT_MS) == OW_TIMEOUT)
-//	{
-//		return OW_TIMEOUT;
-//	}
 
 	OW_UART_Init(115200);
 
@@ -175,7 +145,6 @@ uint8_t OW_Send(uint8_t sendReset, uint8_t *command, uint8_t cLen, uint8_t *data
 
 	while (cLen > 0)
 	{
-
 		OW_toBits(*command, ow_buf);
 		command++;
 		cLen--;
@@ -183,21 +152,15 @@ uint8_t OW_Send(uint8_t sendReset, uint8_t *command, uint8_t cLen, uint8_t *data
 		HAL_UART_Transmit_DMA(&HUARTx, ow_buf, sizeof(ow_buf));
 		HAL_UART_Receive_DMA(&HUARTx, ow_buf, sizeof(ow_buf));
 
-//		while (HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY)
-//		{
-//			__NOP();
-//		}
+		uint32_t tickstart = 0U;
+		tickstart = HAL_GetTick();
 
-			uint32_t tickstart = 0U;
-			tickstart = HAL_GetTick();
-
-			while(HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY) {
-				if ((HAL_GetTick() - tickstart) > OW_DATA_SEND_TIMEOUT_VALUE)
-				{
-//					return 0;
-					return OW_TIMEOUT;
-				}
+		while(HAL_UART_GetState(&HUARTx) != HAL_UART_STATE_READY) {
+			if ((HAL_GetTick() - tickstart) > OW_DATA_SEND_TIMEOUT_VALUE)
+			{
+				return OW_TIMEOUT;
 			}
+		}
 
 		if (readStart == 0 && dLen > 0)
 		{
@@ -220,11 +183,9 @@ uint8_t OW_Send(uint8_t sendReset, uint8_t *command, uint8_t cLen, uint8_t *data
 #if ONEWIRE_SEARCH
 
 uint8_t OW_Search(uint8_t *buf, uint8_t num, uint8_t *found)
-//uint8_t OW_Search(uint8_t *buf, uint8_t num)
 {
 
 	uint8_t error_status = 0;
-//	uint8_t found = 0;
 
 	*found = 0;
 	uint8_t *lastDevice = NULL;
@@ -241,10 +202,6 @@ uint8_t OW_Search(uint8_t *buf, uint8_t num, uint8_t *found)
 		error_status = OW_Send(OW_SEND_RESET, (uint8_t*)"\xf0", 1, NULL, 0, OW_NO_READ);
 
 		if (error_status != 0) {
-			char buf[38];
-			sprintf(buf, "\r\nerror %d\r\n", error_status);
-			printf(buf);
-
 			return error_status;
 		}
 
@@ -255,10 +212,6 @@ uint8_t OW_Search(uint8_t *buf, uint8_t num, uint8_t *found)
 			error_status = OW_SendBits(2);
 
 			if (error_status != 0) {
-				char buf[38];
-				sprintf(buf, "\r\nerror2 %d\r\n", error_status);
-				printf(buf);
-
 				return error_status;
 			}
 
@@ -266,7 +219,6 @@ uint8_t OW_Search(uint8_t *buf, uint8_t num, uint8_t *found)
 			{
 				if (ow_buf[1] == OW_R_1)
 				{
-//					return found;
 					return 0;
 				}
 				else
@@ -331,10 +283,6 @@ uint8_t OW_Search(uint8_t *buf, uint8_t num, uint8_t *found)
 			error_status = OW_SendBits(1);
 
 			if (error_status != 0) {
-				char buf[38];
-				sprintf(buf, "\r\nerror3 %d\r\n", error_status);
-				printf(buf);
-
 				return error_status;
 			}
 		}
@@ -345,14 +293,13 @@ uint8_t OW_Search(uint8_t *buf, uint8_t num, uint8_t *found)
 		curDevice += 8;
 		if (currentCollision == 0)
 		{
-//			return found;
+
 			return 0;
 		}
 
 		lastCollision = currentCollision;
 	}
 
-//	return found;
 	return 0;
 }
 

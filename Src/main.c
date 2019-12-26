@@ -471,7 +471,6 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
 	  // call sensors.requestTemperatures() to issue a global temperature
 	  // request to all devices on the bus
 	  printf("Requesting temperatures...");
@@ -483,7 +482,6 @@ int main(void)
 	  sprintf(buf, "%.2f\r\n", DT_GetTempCByIndex(0));
 	  printf(buf);
 	  HAL_Delay(2000);
-
 //	  struct bme280_data comp_data;
 //	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
@@ -543,7 +541,6 @@ int main(void)
 			u8g2_DrawStr(&u8g2, 0, 105, tmp_string);
 
 		 } while (u8g2_NextPage(&u8g2));
-
   }
   /* USER CODE END 3 */
 }

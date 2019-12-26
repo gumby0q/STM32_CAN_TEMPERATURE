@@ -1,8 +1,6 @@
 /*
  * DallasTemperature.c
  *
- *  Created on: 21 ���. 2019 �.
- *      Author: Andriy
  */
 
 #include "DallasTemperature.h"

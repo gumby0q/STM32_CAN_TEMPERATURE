@@ -1,8 +1,6 @@
 /*
  * DallasTemperature.h
  *
- *  Created on: 21 ���. 2019 �.
- *      Author: Andriy
  */
 
 #ifndef DALLASTEMPERATURE_H_

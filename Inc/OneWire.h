@@ -1,8 +1,6 @@
 /*
  * OneWire.h
  *
- *  Created on: 18 ���. 2019 �.
- *      Author: Andriy Honcharenko
  */
 
 #ifndef ONEWIRE_H_
@@ -57,7 +55,6 @@ uint8_t OW_Init();
 uint8_t OW_Reset(void);
 uint8_t OW_Send(uint8_t sendReset, uint8_t *command, uint8_t cLen, uint8_t *data, uint8_t dLen, uint8_t readStart);
 uint8_t OW_Search(uint8_t *buf, uint8_t num, uint8_t * found);
-//uint8_t OW_Search(uint8_t *buf, uint8_t num);
 uint8_t OW_crc8(const uint8_t *addr, uint8_t len);
 uint16_t OW_crc16(const uint8_t* input, uint16_t len, uint16_t crc);
 
