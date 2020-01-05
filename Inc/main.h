@@ -68,6 +68,8 @@ void Error_Handler(void);
 #define DISPLAY_RESET_GPIO_Port GPIOB
 #define DISPLAY_DC_Pin GPIO_PIN_1
 #define DISPLAY_DC_GPIO_Port GPIOB
+#define RELAY_Pin GPIO_PIN_15
+#define RELAY_GPIO_Port GPIOA
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

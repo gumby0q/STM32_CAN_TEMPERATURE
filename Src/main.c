@@ -40,6 +40,8 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+#define BOILER_TEMP_CAN_ID 0x0d0
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -366,20 +368,17 @@ int main(void)
 	  Error_Handler();
   }
 
-  TxHeader.StdId = 0x021;
-  TxHeader.ExtId = 0x01;
+
+  TxHeader.StdId = BOILER_TEMP_CAN_ID;
+  TxHeader.ExtId = 0x00;
   TxHeader.RTR = CAN_RTR_DATA;
   TxHeader.IDE = CAN_ID_STD;
-  TxHeader.DLC = 8;
+  TxHeader.DLC = 4;
   TxHeader.TransmitGlobalTime = DISABLE;
   TxData[0] = 1;
   TxData[1] = 2;
   TxData[2] = 3;
   TxData[3] = 4;
-  TxData[4] = 5;
-  TxData[5] = 6;
-  TxData[6] = 7;
-  TxData[7] = 8;
 
 
   HAL_GPIO_WritePin(CS0_BME280_GPIO_Port, CS0_BME280_Pin, GPIO_PIN_SET);
@@ -479,9 +478,19 @@ int main(void)
 	  // After we got the temperatures, we can print them here.
 	  // We use the function ByIndex, and as an example get the temperature from the first sensor only.
 	  printf("Temperature for the device 1 (index 0) is: ");
-	  sprintf(buf, "%.2f\r\n", DT_GetTempCByIndex(0));
+	  float ds_temperature = DT_GetTempCByIndex(0);
+	  sprintf(buf, "%.2f\r\n", ds_temperature);
 	  printf(buf);
-	  HAL_Delay(2000);
+
+	  TxHeader.StdId = BOILER_TEMP_CAN_ID;
+
+	  for (int i=0; i<4 ;++i) {
+		  TxData[i] = ((uint8_t*)&ds_temperature)[i];
+	  }
+
+	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+
+	  HAL_Delay(5000);
 //	  struct bme280_data comp_data;
 //	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
@@ -807,7 +816,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, CS1_DISPLAY_Pin|CS0_BME280_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, CS1_DISPLAY_Pin|CS0_BME280_Pin|RELAY_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, DISPLAY_RESET_Pin|DISPLAY_DC_Pin, GPIO_PIN_RESET);
@@ -819,8 +828,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CS1_DISPLAY_Pin CS0_BME280_Pin */
-  GPIO_InitStruct.Pin = CS1_DISPLAY_Pin|CS0_BME280_Pin;
+  /*Configure GPIO pins : CS1_DISPLAY_Pin CS0_BME280_Pin RELAY_Pin */
+  GPIO_InitStruct.Pin = CS1_DISPLAY_Pin|CS0_BME280_Pin|RELAY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

@@ -1,7 +1,7 @@
 [PreviousGenFiles]
-HeaderPath=/home/anatolii/STM32Cube/STM32_CAN_TEMPERATURE/Inc
+HeaderPath=/home/anatolii/STM32Cube/STM_CAN_TEMPERATURE/Inc
 HeaderFiles=stm32f1xx_it.h;stm32f1xx_hal_conf.h;main.h;
-SourcePath=/home/anatolii/STM32Cube/STM32_CAN_TEMPERATURE/Src
+SourcePath=/home/anatolii/STM32Cube/STM_CAN_TEMPERATURE/Src
 SourceFiles=stm32f1xx_it.c;stm32f1xx_hal_msp.c;main.c;
 
 [PreviousLibFiles]
