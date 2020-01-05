@@ -300,6 +300,21 @@ uint8_t u8x8_byte_4wire_hw_spi(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
   return 1;
 }
 
+
+void Control_peripheral_relays(uint8_t flag_holder) {
+	uint8_t flag = 0;
+
+	/* control relays */
+	flag = flag_holder & 0x01;
+	if (flag != 0) {
+		/* on */
+		HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_RESET);
+	} else {
+		/* off */
+		HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_SET);
+	}
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -338,6 +353,10 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
   /* USER CODE BEGIN 2 */
+
+  /* off realays */
+  HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_SET);
+
 
 
   sFilterConfig.FilterBank = 0;
@@ -816,7 +835,7 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, CS1_DISPLAY_Pin|CS0_BME280_Pin|RELAY_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, CS1_DISPLAY_Pin|CS0_BME280_Pin|RELAY0_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, DISPLAY_RESET_Pin|DISPLAY_DC_Pin, GPIO_PIN_RESET);
@@ -828,8 +847,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CS1_DISPLAY_Pin CS0_BME280_Pin RELAY_Pin */
-  GPIO_InitStruct.Pin = CS1_DISPLAY_Pin|CS0_BME280_Pin|RELAY_Pin;
+  /*Configure GPIO pins : CS1_DISPLAY_Pin CS0_BME280_Pin */
+  GPIO_InitStruct.Pin = CS1_DISPLAY_Pin|CS0_BME280_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -841,6 +860,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : RELAY0_Pin */
+  GPIO_InitStruct.Pin = RELAY0_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(RELAY0_GPIO_Port, &GPIO_InitStruct);
 
 }
 
@@ -876,6 +902,8 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 		humidity = u;
 		humidity1timeout = 0;
 		humidity2timeout = 0;
+	}else if(RxHeader.StdId==0x80){
+		Control_peripheral_relays(RxData[0]);
 	}
 }
 
