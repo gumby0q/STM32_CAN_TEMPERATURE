@@ -41,6 +41,9 @@
 /* USER CODE BEGIN PD */
 
 #define BOILER_TEMP_CAN_ID 0x0d0
+#define RELAY_CONTROL_CAN_ID 0x080
+#define RELAY_STATUS_CAN_ID 0x081
+
 
 /* USER CODE END PD */
 
@@ -84,6 +87,7 @@ uint32_t TxMailbox;
 
 struct bme280_data comp_data;
 
+volatile uint8_t relays_status = 0x00;
 
 /* USER CODE END PV */
 
@@ -313,6 +317,8 @@ void Control_peripheral_relays(uint8_t flag_holder) {
 		/* off */
 		HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_SET);
 	}
+
+	relays_status = flag_holder;
 }
 
 /* USER CODE END 0 */
@@ -502,6 +508,7 @@ int main(void)
 	  printf(buf);
 
 	  TxHeader.StdId = BOILER_TEMP_CAN_ID;
+	  TxHeader.DLC = 4;
 
 	  for (int i=0; i<4 ;++i) {
 		  TxData[i] = ((uint8_t*)&ds_temperature)[i];
@@ -509,7 +516,15 @@ int main(void)
 
 	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
 
-	  HAL_Delay(5000);
+	  HAL_Delay(2500);
+	  /* send relays status */
+	  TxHeader.StdId = RELAY_STATUS_CAN_ID;
+	  TxHeader.DLC = 1;
+	  TxData[0] = relays_status;
+	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+	  HAL_Delay(2500);
+
+
 //	  struct bme280_data comp_data;
 //	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
@@ -902,7 +917,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 		humidity = u;
 		humidity1timeout = 0;
 		humidity2timeout = 0;
-	}else if(RxHeader.StdId==0x80){
+	}else if(RxHeader.StdId==RELAY_CONTROL_CAN_ID){
 		Control_peripheral_relays(RxData[0]);
 	}
 }
