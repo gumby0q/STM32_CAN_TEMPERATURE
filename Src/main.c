@@ -40,9 +40,12 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
+//#define BOILER_TEMP_CAN_ID 0x0d0
 #define BOILER_TEMP_CAN_ID 0x0d0
-#define RELAY_CONTROL_CAN_ID 0x080
-#define RELAY_STATUS_CAN_ID 0x081
+//#define RELAY_CONTROL_CAN_ID 0x080
+#define RELAY_CONTROL_CAN_ID 0x090
+//#define RELAY_STATUS_CAN_ID 0x081
+#define RELAY_STATUS_CAN_ID 0x091
 
 
 /* USER CODE END PD */
@@ -70,6 +73,9 @@ static u8g2_t u8g2;
 int32_t temperature;
 uint32_t pressure;
 uint32_t humidity;
+float input_packet_boiler_temperature;
+
+volatile uint8_t input_packet_boiler_timeout = 0;
 
 volatile uint8_t temperature1timeout = 0;
 volatile uint8_t temperature2timeout = 0;
@@ -118,6 +124,9 @@ void printAddress(CurrentDeviceAddress deviceAddress)
  printf(buf);
   }
 }
+
+void display_update(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -132,6 +141,7 @@ void user_delay_ms(uint32_t period);
 int8_t user_spi_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len);
 int8_t user_spi_write(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len);
 
+void read_and_send_ds_data(void);
 
 
 int8_t setup_bme280(void) {
@@ -321,6 +331,106 @@ void Control_peripheral_relays(uint8_t flag_holder) {
 	relays_status = flag_holder;
 }
 
+void read_and_send_ds_data(void) {
+	printf("Requesting temperatures...");
+
+	char buf[30];
+
+	DT_RequestTemperatures(); // Send the command to get temperatures
+	printf("DONE\r\n");
+	// After we got the temperatures, we can print them here.
+	// We use the function ByIndex, and as an example get the temperature from the first sensor only.
+	printf("Temperature for the device 1 (index 0) is: ");
+	float ds_temperature = DT_GetTempCByIndex(0);
+	sprintf(buf, "%.2f\r\n", ds_temperature);
+	printf(buf);
+
+	TxHeader.StdId = BOILER_TEMP_CAN_ID;
+	TxHeader.DLC = 4;
+
+	for (int i=0; i<4 ;++i) {
+	  TxData[i] = ((uint8_t*)&ds_temperature)[i];
+	}
+
+	HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+
+	HAL_Delay(2500);
+	/* send relays status */
+	TxHeader.StdId = RELAY_STATUS_CAN_ID;
+	TxHeader.DLC = 1;
+	TxData[0] = relays_status;
+	HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+}
+
+void display_update(void) {
+
+	int16_t tempInt;
+	uint32_t tempUInt;
+	int16_t tempDec;
+
+	u8g2_SetFont(&u8g2, u8g2_font_logisoso18_tr );
+
+	char tmp_string[100];
+	u8g2_FirstPage(&u8g2);
+	do
+	 {
+
+		////// boiler temp
+		if(input_packet_boiler_timeout == DATA_WAIT_TIMEOUT){
+			sprintf(tmp_string, "B xxx");
+		}else{
+//			tempInt = (int16_t)(input_packet_boiler_temperature);
+//			tempDec = (uint16_t)(input_packet_boiler_temperature%1);
+			sprintf(tmp_string, "B %.2f", input_packet_boiler_temperature);
+		}
+		u8g2_DrawStr(&u8g2, 0, 20, tmp_string);
+
+		//////t1
+		if(temperature1timeout == DATA_WAIT_TIMEOUT){
+			sprintf(tmp_string, "T xxx");
+		}else{
+			tempInt = (int16_t)(temperature/100);
+			tempDec = (uint16_t)(temperature%100);
+			sprintf(tmp_string, "T %d,%u", tempInt, tempDec);
+		}
+		u8g2_DrawStr(&u8g2, 0, 45, tmp_string);
+
+
+		//////h1
+		if(humidity1timeout == DATA_WAIT_TIMEOUT){
+			sprintf(tmp_string, "H xxx");
+		}else{
+			tempUInt = (uint32_t)(humidity/1024);
+			tempDec = (uint16_t)(humidity%1024);
+			sprintf(tmp_string, "H %lu,%u", tempUInt, tempDec);
+			printf(tmp_string);
+		}
+		u8g2_DrawStr(&u8g2, 0, 70, tmp_string);
+
+
+		//////t2
+		if(temperature2timeout == DATA_WAIT_TIMEOUT){
+			sprintf(tmp_string, "T xxx");
+		}else{
+			tempInt = (int16_t)(temperature/100);
+			tempDec = (uint16_t)(temperature%100);
+			sprintf(tmp_string, "T %u,%u", tempInt, tempDec);
+		}
+		u8g2_DrawStr(&u8g2, 0, 100, tmp_string);
+
+
+		//////h2
+		if(humidity2timeout == DATA_WAIT_TIMEOUT){
+			sprintf(tmp_string, "H xxx");
+		}else{
+			tempUInt = (uint32_t)(humidity/1024);
+			tempDec = (uint16_t)(humidity%1024);
+		}
+		u8g2_DrawStr(&u8g2, 0, 125, tmp_string);
+
+	 } while (u8g2_NextPage(&u8g2));
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -411,8 +521,10 @@ int main(void)
 
 
   HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_SET);
-  u8g2_Setup_ssd1306_128x64_noname_1(&u8g2, U8G2_R1, u8x8_byte_4wire_hw_spi,
-      u8x8_stm32_gpio_and_delay);
+  u8g2_Setup_ssd1306_128x64_noname_1(&u8g2,
+									 U8G2_R1,
+									 u8x8_byte_4wire_hw_spi,
+									 u8x8_stm32_gpio_and_delay);
   u8g2_InitDisplay(&u8g2);
   u8g2_SetPowerSave(&u8g2, 0);
 //  int8_t rslt;
@@ -484,106 +596,24 @@ int main(void)
 	    u8g2_SetFont(&u8g2, u8g2_font_ncenB14_tr);
 		u8g2_DrawStr(&u8g2, 5, 30, "Hello world ");
 	 } while (u8g2_NextPage(&u8g2));
-	u8g2_SetFont(&u8g2, u8g2_font_logisoso18_tr );
 
-	int16_t tempInt;
-	uint32_t tempUInt;
-	int16_t tempDec;
+//    read_and_send_ds_data();
 
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  // call sensors.requestTemperatures() to issue a global temperature
-	  // request to all devices on the bus
-	  printf("Requesting temperatures...");
-	  DT_RequestTemperatures(); // Send the command to get temperatures
-	  printf("DONE\r\n");
-	  // After we got the temperatures, we can print them here.
-	  // We use the function ByIndex, and as an example get the temperature from the first sensor only.
-	  printf("Temperature for the device 1 (index 0) is: ");
-	  float ds_temperature = DT_GetTempCByIndex(0);
-	  sprintf(buf, "%.2f\r\n", ds_temperature);
-	  printf(buf);
-
-	  TxHeader.StdId = BOILER_TEMP_CAN_ID;
-	  TxHeader.DLC = 4;
-
-	  for (int i=0; i<4 ;++i) {
-		  TxData[i] = ((uint8_t*)&ds_temperature)[i];
-	  }
-
-	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
-
+//	  read_and_send_ds_data();
 	  HAL_Delay(2500);
-	  /* send relays status */
-	  TxHeader.StdId = RELAY_STATUS_CAN_ID;
-	  TxHeader.DLC = 1;
-	  TxData[0] = relays_status;
-	  HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
-	  HAL_Delay(2500);
-
-
 //	  struct bme280_data comp_data;
 //	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
 
-	  uint8_t test_uart_data[2] = { 1, 8 };
-	  HAL_UART_Transmit(&huart3, test_uart_data, sizeof(test_uart_data), 50);
-
 	  HAL_Delay(1000);
-//	  TxData[7] = TxData[7] + 1;
 
 //	    HAL_GPIO_TogglePin(GPIOC, LED_Pin);
-		char tmp_string[100];
-		u8g2_FirstPage(&u8g2);
-		do
-		 {
-			//////t1
-			if(temperature1timeout == DATA_WAIT_TIMEOUT){
-			    sprintf(tmp_string, "T xxx");
-			}else{
-				tempInt = (int16_t)(temperature/100);
-				tempDec = (uint16_t)(temperature%100);
-				sprintf(tmp_string, "T %d,%u", tempInt, tempDec);
-			}
-			u8g2_DrawStr(&u8g2, 0, 20, tmp_string);
-
-
-			//////h1
-			if(humidity1timeout == DATA_WAIT_TIMEOUT){
-			    sprintf(tmp_string, "H xxx");
-			}else{
-				tempUInt = (uint32_t)(humidity/1024);
-				tempDec = (uint16_t)(humidity%1024);
-				sprintf(tmp_string, "H %lu,%u", tempUInt, tempDec);
-				printf(tmp_string);
-			}
-			u8g2_DrawStr(&u8g2, 0, 45, tmp_string);
-
-
-			//////t2
-			if(temperature2timeout == DATA_WAIT_TIMEOUT){
-			    sprintf(tmp_string, "T xxx");
-			}else{
-				tempInt = (int16_t)(temperature/100);
-				tempDec = (uint16_t)(temperature%100);
-				sprintf(tmp_string, "T %u,%u", tempInt, tempDec);
-			}
-			u8g2_DrawStr(&u8g2, 0, 80, tmp_string);
-
-
-			//////h2
-			if(humidity2timeout == DATA_WAIT_TIMEOUT){
-			    sprintf(tmp_string, "H xxx");
-			}else{
-				tempUInt = (uint32_t)(humidity/1024);
-				tempDec = (uint16_t)(humidity%1024);
-			}
-			u8g2_DrawStr(&u8g2, 0, 105, tmp_string);
-
-		 } while (u8g2_NextPage(&u8g2));
+	  display_update();
   }
   /* USER CODE END 3 */
 }
@@ -896,7 +926,7 @@ void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan_)
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 {
 	HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData);
-	//HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
 
 	 uint32_t u;
 	  u = RxData[0];
@@ -919,17 +949,24 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 		humidity2timeout = 0;
 	}else if(RxHeader.StdId==RELAY_CONTROL_CAN_ID){
 		Control_peripheral_relays(RxData[0]);
+	}else if(RxHeader.StdId==BOILER_TEMP_CAN_ID){
+		input_packet_boiler_temperature = u;
+		for (int i=0; i<4 ;++i) {
+			((uint8_t*)&input_packet_boiler_temperature)[i] = RxData[i];
+		}
+		input_packet_boiler_timeout = 0;
 	}
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
   if( htim->Instance == TIM1 ){
-	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+//	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
 	++temperature1timeout;
 	++temperature2timeout;
 	++humidity1timeout;
 	++humidity2timeout;
+	++input_packet_boiler_timeout;
 
 	if(temperature1timeout>= DATA_WAIT_TIMEOUT){
 		temperature1timeout = DATA_WAIT_TIMEOUT;
@@ -947,6 +984,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		humidity2timeout = DATA_WAIT_TIMEOUT;
 	}
 
+	if(input_packet_boiler_timeout>= DATA_WAIT_TIMEOUT){
+		input_packet_boiler_timeout = DATA_WAIT_TIMEOUT;
+	}
  }
 }
 /* USER CODE END 4 */
