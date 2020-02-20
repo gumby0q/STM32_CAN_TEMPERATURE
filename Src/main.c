@@ -30,6 +30,9 @@
 
 #include "OneWire.h"
 #include "DallasTemperature.h"
+
+#include "display_prints.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -69,6 +72,9 @@ DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 static u8g2_t u8g2;
+
+struct display_screen1_data screen1_data;
+
 
 int32_t temperature;
 uint32_t pressure;
@@ -604,16 +610,29 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-//	  read_and_send_ds_data();
+	  read_and_send_ds_data();
 	  HAL_Delay(2500);
 //	  struct bme280_data comp_data;
 //	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
 
-	  HAL_Delay(1000);
+//	  HAL_Delay(1000);
 
 //	    HAL_GPIO_TogglePin(GPIOC, LED_Pin);
-	  display_update();
+//	  display_update();
+
+	  sprintf(screen1_data.str_boiler_value, "ddd1");
+
+	  sprintf(screen1_data.str_tempreture_value_1, "ddd2");
+	  sprintf(screen1_data.str_humidity_value_1, "ddd3");
+
+	  sprintf(screen1_data.str_tempreture_value_2, "ddd4");
+	  sprintf(screen1_data.str_humidity_value_2, "ddd5");
+
+	  sprintf(screen1_data.str_pump_status_1, "ddd6");
+	  sprintf(screen1_data.str_pump_status_2, "ddd7");
+
+	  display_update2(&u8g2, &screen1_data);
   }
   /* USER CODE END 3 */
 }
