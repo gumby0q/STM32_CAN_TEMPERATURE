@@ -24,12 +24,11 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include <string.h>
-#include "bme280.h"
 #include "u8g2.h"
 #include <stdio.h>
 
-#include "OneWire.h"
-#include "DallasTemperature.h"
+#include "display_prints.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,17 +57,19 @@
 /* Private variables ---------------------------------------------------------*/
 CAN_HandleTypeDef hcan;
 
-SPI_HandleTypeDef hspi1;
-
 TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim2;
 
-UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart3;
-DMA_HandleTypeDef hdma_usart1_rx;
-DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 static u8g2_t u8g2;
+
+volatile uint32_t testCounter = 0;
+
+
+struct display_screen1_data screen1_data;
+
 
 int32_t temperature;
 uint32_t pressure;
@@ -91,38 +92,22 @@ uint8_t TxData[8];
 uint8_t RxData[8];
 uint32_t TxMailbox;
 
-struct bme280_data comp_data;
-
-volatile uint8_t relays_status = 0x00;
-
+volatile uint16_t micro_delay_counter = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_CAN_Init(void);
-static void MX_SPI1_Init(void);
 static void MX_TIM1_Init(void);
-static void MX_USART1_UART_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 int _write(int file, char *ptr, int len)
 {
  HAL_UART_Transmit(&huart3, (uint8_t *) ptr, len, HAL_MAX_DELAY);
  return len;
-}
-
-// function to print a device address
-void printAddress(CurrentDeviceAddress deviceAddress)
-{
-  for (uint8_t i = 0; i < 8; i++)
-  {
- char buf[4];
- sprintf(buf, "%02X ", deviceAddress[i]);
- printf(buf);
-  }
 }
 
 void display_update(void);
@@ -134,47 +119,8 @@ void display_update(void);
 
 
 /* ******************************************************************************* */
-struct bme280_dev dev;
-
-int8_t setup_bme280(void);
 void user_delay_ms(uint32_t period);
-int8_t user_spi_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len);
-int8_t user_spi_write(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len);
 
-void read_and_send_ds_data(void);
-
-
-int8_t setup_bme280(void) {
-	int8_t rslt = BME280_OK;
-	uint8_t settings_sel;
-
-	/* Sensor_0 interface over SPI with native chip select line */
-	dev.dev_id = 0;
-	dev.intf = BME280_SPI_INTF;
-	dev.read = user_spi_read;
-	dev.write = user_spi_write;
-	dev.delay_ms = user_delay_ms;
-
-	rslt = bme280_init(&dev);
-
-
-	/* Recommended mode of operation: Indoor navigation */
-	dev.settings.osr_h = BME280_OVERSAMPLING_1X;
-	dev.settings.osr_p = BME280_OVERSAMPLING_16X;
-	dev.settings.osr_t = BME280_OVERSAMPLING_2X;
-	dev.settings.filter = BME280_FILTER_COEFF_16;
-	dev.settings.standby_time = BME280_STANDBY_TIME_62_5_MS;
-
-	settings_sel = BME280_OSR_PRESS_SEL;
-	settings_sel |= BME280_OSR_TEMP_SEL;
-	settings_sel |= BME280_OSR_HUM_SEL;
-	settings_sel |= BME280_STANDBY_SEL;
-	settings_sel |= BME280_FILTER_SEL;
-	rslt = bme280_set_sensor_settings(settings_sel, &dev);
-	rslt = bme280_set_sensor_mode(BME280_NORMAL_MODE, &dev);
-
-	return rslt;
-}
 
 void user_delay_ms(uint32_t period)
 {
@@ -185,182 +131,210 @@ void user_delay_ms(uint32_t period)
      */
 }
 
-int8_t user_spi_read(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
-{
-    int8_t rslt = 0; /* Return 0 for Success, non-zero for failure */
-
-    uint32_t Timeout = 50;
-
-    uint8_t temp_buffer_size = len+1;
-    uint8_t temp_buffer_tx[temp_buffer_size];
-    uint8_t temp_buffer_rx[temp_buffer_size];
-
-    /* setting values for tx buffer */
-    memset(temp_buffer_tx, 0, sizeof(temp_buffer_tx));
-    temp_buffer_tx[0] = reg_addr;
-
-    HAL_GPIO_WritePin(CS0_BME280_GPIO_Port, CS0_BME280_Pin, GPIO_PIN_RESET);
-    rslt = HAL_SPI_TransmitReceive(&hspi1, temp_buffer_tx, temp_buffer_rx, temp_buffer_size, Timeout);
-    HAL_GPIO_WritePin(CS0_BME280_GPIO_Port, CS0_BME280_Pin, GPIO_PIN_SET);
-
-    /* copy received data into origin buffer */
-    memcpy(reg_data, &temp_buffer_rx[1], len);
-
-    /*
-     * The parameter dev_id can be used as a variable to select which Chip Select pin has
-     * to be set low to activate the relevant device on the SPI bus
-     */
-
-    /*
-     * Data on the bus should be like
-     * |----------------+---------------------+-------------|
-     * | MOSI           | MISO                | Chip Select |
-     * |----------------+---------------------|-------------|
-     * | (don't care)   | (don't care)        | HIGH        |
-     * | (reg_addr)     | (don't care)        | LOW         |
-     * | (don't care)   | (reg_data[0])       | LOW         |
-     * | (....)         | (....)              | LOW         |
-     * | (don't care)   | (reg_data[len - 1]) | LOW         |
-     * | (don't care)   | (don't care)        | HIGH        |
-     * |----------------+---------------------|-------------|
-     */
-
-    return rslt;
+void send_8080_data_delay_100u(uint16_t delay) {
+//	HAL_Delay(1);
+	micro_delay_counter = delay+1;
+	while(micro_delay_counter > 0) {
+	}
 }
 
-int8_t user_spi_write(uint8_t dev_id, uint8_t reg_addr, uint8_t *reg_data, uint16_t len)
-{
-    int8_t rslt = 0; /* Return 0 for Success, non-zero for failure */
+void send_8080_data(uint8_t arg_int, void *arg_ptr) {
+	uint8_t quantity = arg_int;
+	uint8_t * data_buffer = arg_ptr;
+	for (uint8_t i = 0; i < quantity; i++) {
+		uint8_t byte = data_buffer[i];
 
-    uint32_t Timeout = 50;
+		HAL_GPIO_WritePin(DISPLAY_D0_GPIO_Port, DISPLAY_D0_Pin, byte & 0x01);
+		HAL_GPIO_WritePin(DISPLAY_D1_GPIO_Port, DISPLAY_D1_Pin, byte & 0x02);
+		HAL_GPIO_WritePin(DISPLAY_D2_GPIO_Port, DISPLAY_D2_Pin, byte & 0x04);
+		HAL_GPIO_WritePin(DISPLAY_D3_GPIO_Port, DISPLAY_D3_Pin, byte & 0x08);
 
-    uint8_t temp_buffer_size = len+1;
-    uint8_t temp_buffer[temp_buffer_size];
+		HAL_GPIO_WritePin(DISPLAY_D4_GPIO_Port, DISPLAY_D4_Pin, byte & 0x10);
+		HAL_GPIO_WritePin(DISPLAY_D5_GPIO_Port, DISPLAY_D5_Pin, byte & 0x20);
+		HAL_GPIO_WritePin(DISPLAY_D6_GPIO_Port, DISPLAY_D6_Pin, byte & 0x40);
+		HAL_GPIO_WritePin(DISPLAY_D7_GPIO_Port, DISPLAY_D7_Pin, byte & 0x80);
 
-    /* setting values for tx buffer */
-    temp_buffer[0] = reg_addr;
-    memcpy(&temp_buffer[1], reg_data, len);
+		HAL_GPIO_WritePin(DISPLAY_WR_GPIO_Port, DISPLAY_WR_Pin, GPIO_PIN_RESET);
 
-    HAL_GPIO_WritePin(CS0_BME280_GPIO_Port, CS0_BME280_Pin, GPIO_PIN_RESET);
-    rslt = HAL_SPI_Transmit(&hspi1, temp_buffer, temp_buffer_size, Timeout);
-    HAL_GPIO_WritePin(CS0_BME280_GPIO_Port, CS0_BME280_Pin, GPIO_PIN_SET);
-
-    /*
-     * The parameter dev_id can be used as a variable to select which Chip Select pin has
-     * to be set low to activate the relevant device on the SPI bus
-     */
-
-    /*
-     * Data on the bus should be like
-     * |---------------------+--------------+-------------|
-     * | MOSI                | MISO         | Chip Select |
-     * |---------------------+--------------|-------------|
-     * | (don't care)        | (don't care) | HIGH        |
-     * | (reg_addr)          | (don't care) | LOW         |
-     * | (reg_data[0])       | (don't care) | LOW         |
-     * | (....)              | (....)       | LOW         |
-     * | (reg_data[len - 1]) | (don't care) | LOW         |
-     * | (don't care)        | (don't care) | HIGH        |
-     * |---------------------+--------------|-------------|
-     */
-
-    return rslt;
+		send_8080_data_delay_100u(1);
+		HAL_GPIO_WritePin(DISPLAY_WR_GPIO_Port, DISPLAY_WR_Pin, GPIO_PIN_SET);
+		send_8080_data_delay_100u(1);
+	}
 }
 
-uint8_t u8x8_stm32_gpio_and_delay(U8X8_UNUSED u8x8_t *u8x8,
-    U8X8_UNUSED uint8_t msg, U8X8_UNUSED uint8_t arg_int,
-    U8X8_UNUSED void *arg_ptr)
+uint8_t u8x8_byte_8080(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr)
 {
-  switch (msg)
+  switch(msg)
   {
-  case U8X8_MSG_GPIO_AND_DELAY_INIT:
-    HAL_Delay(1);
-    break;
-  case U8X8_MSG_DELAY_MILLI:
-    HAL_Delay(arg_int);
-    break;
-  case U8X8_MSG_GPIO_DC:
-    HAL_GPIO_WritePin(DISPLAY_DC_GPIO_Port, DISPLAY_DC_Pin, arg_int);
-    break;
-  case U8X8_MSG_GPIO_RESET:
-    HAL_GPIO_WritePin(DISPLAY_RESET_GPIO_Port, DISPLAY_RESET_Pin, arg_int);
-    break;
+    case U8X8_MSG_BYTE_SEND:
+    	send_8080_data(arg_int, arg_ptr);
+
+      break;
+    case U8X8_MSG_BYTE_INIT:
+      break;
+    case U8X8_MSG_BYTE_SET_DC:
+    	HAL_GPIO_WritePin(DISPLAY_A0_GPIO_Port, DISPLAY_A0_Pin, arg_int);
+
+      break;
+    case U8X8_MSG_BYTE_START_TRANSFER:
+    	HAL_GPIO_WritePin(DISPLAY_CS_GPIO_Port, DISPLAY_CS_Pin, GPIO_PIN_RESET);
+
+      break;
+    case U8X8_MSG_BYTE_END_TRANSFER:
+    	HAL_GPIO_WritePin(DISPLAY_CS_GPIO_Port, DISPLAY_CS_Pin, GPIO_PIN_SET);
+
+      break;
+    default:
+      return 0;
   }
   return 1;
 }
 
-uint8_t u8x8_byte_4wire_hw_spi(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
-    void *arg_ptr)
+uint8_t u8x8_gpio_and_delay_8080(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int, void *arg_ptr)
 {
-  switch (msg)
+  switch(msg)
   {
-  case U8X8_MSG_BYTE_SEND:
-    HAL_SPI_Transmit(&hspi1, (uint8_t *) arg_ptr, arg_int, 10000);
-    break;
-  case U8X8_MSG_BYTE_INIT:
-    break;
-  case U8X8_MSG_BYTE_SET_DC:
-    HAL_GPIO_WritePin(DISPLAY_DC_GPIO_Port, DISPLAY_DC_Pin, arg_int);
-    break;
-  case U8X8_MSG_BYTE_START_TRANSFER:
-		HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_RESET);
-    break;
-  case U8X8_MSG_BYTE_END_TRANSFER:
-		HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_SET);
-    break;
-  default:
-    return 0;
+    case U8X8_MSG_GPIO_AND_DELAY_INIT:	// called once during init phase of u8g2/u8x8
+    	  HAL_GPIO_WritePin(DISPLAY_RD_GPIO_Port, DISPLAY_RD_Pin, GPIO_PIN_SET);
+    	  HAL_GPIO_WritePin(DISPLAY_CS_GPIO_Port, DISPLAY_CS_Pin, GPIO_PIN_SET);
+    	  HAL_Delay(1);
+
+    	break;							// can be used to setup pins
+    case U8X8_MSG_DELAY_NANO:			// delay arg_int * 1 nano second
+      break;
+    case U8X8_MSG_DELAY_100NANO:		// delay arg_int * 100 nano seconds
+      break;
+    case U8X8_MSG_DELAY_10MICRO:		// delay arg_int * 10 micro seconds
+      break;
+    case U8X8_MSG_DELAY_MILLI:			// delay arg_int * 1 milli second
+    	HAL_Delay(arg_int);
+
+    	break;
+    case U8X8_MSG_DELAY_I2C:				// arg_int is the I2C speed in 100KHz, e.g. 4 = 400 KHz
+      break;							// arg_int=1: delay by 5us, arg_int = 4: delay by 1.25us
+    case U8X8_MSG_GPIO_D0:				// D0 or SPI clock pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_D0_GPIO_Port, DISPLAY_D0_Pin, arg_int);
+
+    	break;
+    case U8X8_MSG_GPIO_D1:				// D1 or SPI data pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_D1_GPIO_Port, DISPLAY_D1_Pin, arg_int);
+
+    //case U8X8_MSG_GPIO_SPI_DATA:
+      break;
+    case U8X8_MSG_GPIO_D2:				// D2 pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_D2_GPIO_Port, DISPLAY_D2_Pin, arg_int);
+
+      break;
+    case U8X8_MSG_GPIO_D3:				// D3 pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_D3_GPIO_Port, DISPLAY_D3_Pin, arg_int);
+
+      break;
+    case U8X8_MSG_GPIO_D4:				// D4 pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_D4_GPIO_Port, DISPLAY_D4_Pin, arg_int);
+
+      break;
+    case U8X8_MSG_GPIO_D5:				// D5 pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_D5_GPIO_Port, DISPLAY_D5_Pin, arg_int);
+
+    	break;
+    case U8X8_MSG_GPIO_D6:				// D6 pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_D6_GPIO_Port, DISPLAY_D6_Pin, arg_int);
+
+      break;
+    case U8X8_MSG_GPIO_D7:				// D7 pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_D7_GPIO_Port, DISPLAY_D7_Pin, arg_int);
+
+      break;
+    case U8X8_MSG_GPIO_E:				// E/WR pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_WR_GPIO_Port, DISPLAY_WR_Pin, arg_int);
+
+      break;
+    case U8X8_MSG_GPIO_CS:				// CS (chip select) pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_CS_GPIO_Port, DISPLAY_CS_Pin, arg_int);
+
+      break;
+    case U8X8_MSG_GPIO_DC:				// DC (data/cmd, A0, register select) pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_A0_GPIO_Port, DISPLAY_A0_Pin, arg_int);
+
+    	break;
+    case U8X8_MSG_GPIO_RESET:			// Reset pin: Output level in arg_int
+    	HAL_GPIO_WritePin(DISPLAY_RESET_GPIO_Port, DISPLAY_RESET_Pin, arg_int);
+
+    	break;
+    case U8X8_MSG_GPIO_CS1:				// CS1 (chip select) pin: Output level in arg_int
+      break;
+    case U8X8_MSG_GPIO_CS2:				// CS2 (chip select) pin: Output level in arg_int
+      break;
+    case U8X8_MSG_GPIO_I2C_CLOCK:		// arg_int=0: Output low at I2C clock pin
+      break;							// arg_int=1: Input dir with pullup high for I2C clock pin
+    case U8X8_MSG_GPIO_I2C_DATA:			// arg_int=0: Output low at I2C data pin
+      break;							// arg_int=1: Input dir with pullup high for I2C data pin
+    case U8X8_MSG_GPIO_MENU_SELECT:
+//      u8x8_SetGPIOResult(u8x8, /* get menu select pin state */ 0);
+      break;
+    case U8X8_MSG_GPIO_MENU_NEXT:
+//      u8x8_SetGPIOResult(u8x8, /* get menu next pin state */ 0);
+      break;
+    case U8X8_MSG_GPIO_MENU_PREV:
+//      u8x8_SetGPIOResult(u8x8, /* get menu prev pin state */ 0);
+      break;
+    case U8X8_MSG_GPIO_MENU_HOME:
+//      u8x8_SetGPIOResult(u8x8, /* get menu home pin state */ 0);
+      break;
+    default:
+//      u8x8_SetGPIOResult(u8x8, 1);			// default return value
+      break;
   }
   return 1;
 }
 
-
-void Control_peripheral_relays(uint8_t flag_holder) {
-	uint8_t flag = 0;
-
-	/* control relays */
-	flag = flag_holder & 0x01;
-	if (flag != 0) {
-		/* on */
-		HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_RESET);
-	} else {
-		/* off */
-		HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_SET);
-	}
-
-	relays_status = flag_holder;
-}
-
-void read_and_send_ds_data(void) {
-	printf("Requesting temperatures...");
-
-	char buf[30];
-
-	DT_RequestTemperatures(); // Send the command to get temperatures
-	printf("DONE\r\n");
-	// After we got the temperatures, we can print them here.
-	// We use the function ByIndex, and as an example get the temperature from the first sensor only.
-	printf("Temperature for the device 1 (index 0) is: ");
-	float ds_temperature = DT_GetTempCByIndex(0);
-	sprintf(buf, "%.2f\r\n", ds_temperature);
-	printf(buf);
-
-	TxHeader.StdId = BOILER_TEMP_CAN_ID;
-	TxHeader.DLC = 4;
-
-	for (int i=0; i<4 ;++i) {
-	  TxData[i] = ((uint8_t*)&ds_temperature)[i];
-	}
-
-	HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
-
-	HAL_Delay(2500);
-	/* send relays status */
-	TxHeader.StdId = RELAY_STATUS_CAN_ID;
-	TxHeader.DLC = 1;
-	TxData[0] = relays_status;
-	HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
-}
+//uint8_t u8x8_stm32_gpio_and_delay(U8X8_UNUSED u8x8_t *u8x8,
+//    U8X8_UNUSED uint8_t msg, U8X8_UNUSED uint8_t arg_int,
+//    U8X8_UNUSED void *arg_ptr)
+//{
+//  switch (msg)
+//  {
+//  case U8X8_MSG_GPIO_AND_DELAY_INIT:
+//    HAL_Delay(1);
+//    break;
+//  case U8X8_MSG_DELAY_MILLI:
+//    HAL_Delay(arg_int);
+//    break;
+//  case U8X8_MSG_GPIO_DC:
+////    HAL_GPIO_WritePin(DISPLAY_DC_GPIO_Port, DISPLAY_DC_Pin, arg_int);
+//    HAL_GPIO_WritePin(DISPLAY_A0_GPIO_Port, DISPLAY_A0_Pin, arg_int);
+//    break;
+//  case U8X8_MSG_GPIO_RESET:
+//    HAL_GPIO_WritePin(DISPLAY_RESET_GPIO_Port, DISPLAY_RESET_Pin, arg_int);
+//    break;
+//  }
+//  return 1;
+//}
+//
+//uint8_t u8x8_byte_4wire_hw_spi(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
+//    void *arg_ptr)
+//{
+//  switch (msg)
+//  {
+//  case U8X8_MSG_BYTE_SEND:
+//    HAL_SPI_Transmit(&hspi1, (uint8_t *) arg_ptr, arg_int, 10000);
+//    break;
+//  case U8X8_MSG_BYTE_INIT:
+//    break;
+//  case U8X8_MSG_BYTE_SET_DC:
+//    HAL_GPIO_WritePin(DISPLAY_DC_GPIO_Port, DISPLAY_DC_Pin, arg_int);
+//    break;
+//  case U8X8_MSG_BYTE_START_TRANSFER:
+//		HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_RESET);
+//    break;
+//  case U8X8_MSG_BYTE_END_TRANSFER:
+//		HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_SET);
+//    break;
+//  default:
+//    return 0;
+//  }
+//  return 1;
+//}
 
 void display_update(void) {
 
@@ -442,7 +416,7 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
-  
+
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -462,18 +436,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_CAN_Init();
-  MX_SPI1_Init();
   MX_TIM1_Init();
-  MX_USART1_UART_Init();
   MX_USART3_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
 
   /* off realays */
-  HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_SET);
-
-
 
   sFilterConfig.FilterBank = 0;
   sFilterConfig.FilterMode = CAN_FILTERMODE_IDMASK;
@@ -516,104 +485,137 @@ int main(void)
   TxData[3] = 4;
 
 
-  HAL_GPIO_WritePin(CS0_BME280_GPIO_Port, CS0_BME280_Pin, GPIO_PIN_SET);
-  setup_bme280();
+  /* display init >> */
+
+  HAL_TIM_Base_Start_IT(&htim1);
+  HAL_TIM_Base_Start_IT(&htim2);
 
 
-  HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_SET);
-  u8g2_Setup_ssd1306_128x64_noname_1(&u8g2,
-									 U8G2_R1,
-									 u8x8_byte_4wire_hw_spi,
-									 u8x8_stm32_gpio_and_delay);
+
+
+  /* turn on backlight */
+  HAL_GPIO_WritePin(BACKLIGHT_GPIO_Port, BACKLIGHT_Pin, GPIO_PIN_SET);
+
+  HAL_GPIO_WritePin(DISPLAY_RD_GPIO_Port, DISPLAY_RD_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(DISPLAY_CS_GPIO_Port, DISPLAY_CS_Pin, GPIO_PIN_SET);
+
+  // --->>>
+
+    u8g2_Setup_st7565_ea_dogm128_1(&u8g2, U8G2_R2, u8x8_byte_8080, u8x8_gpio_and_delay_8080);
+//  u8g2_Setup_st7565_zolen_128x64_1(&u8g2, U8G2_R2, u8x8_byte_8080, u8x8_gpio_and_delay_8080);// bad and mirrored
+//  u8g2_Setup_st7565_lx12864_1(&u8g2, U8G2_R2, u8x8_byte_8080, u8x8_gpio_and_delay_8080); //bad
+//  u8g2_Setup_st7565_erc12864_1(&u8g2, U8G2_R2, u8x8_byte_8080, u8x8_gpio_and_delay_8080);// not good and white
+//  u8g2_Setup_st7565_erc12864_alt_1(&u8g2, U8G2_R2, u8x8_byte_8080, u8x8_gpio_and_delay_8080); //bad
+//  u8g2_Setup_st7565_nhd_c12864_1(&u8g2, U8G2_R2, u8x8_byte_8080, u8x8_gpio_and_delay_8080); //bad but in the right position
+//  u8g2_Setup_st7565_jlx12864_1(&u8g2, U8G2_R2, u8x8_byte_8080, u8x8_gpio_and_delay_8080);//bad but in the right position
+
+//  u8g2_Setup_st7565_ea_dogm128_1
+//  /* default_x_offset = */ 0, fix -> to 4
+//  /* flipmode_x_offset = */ 4, fix -> to 0
+
+//  u8g2_Setup_st7565_nhd_c12864_1
+  //  /* default_x_offset = */ 4,
+  //  /* flipmode_x_offset = */ 0,
+
+
+//  u8g2_Setup_ssd1306_128x64_noname_1(&u8g2,
+//									 U8G2_R1,
+//									 u8x8_byte_4wire_hw_spi,
+//									 u8x8_stm32_gpio_and_delay);
+
+    // ---<<<
   u8g2_InitDisplay(&u8g2);
   u8g2_SetPowerSave(&u8g2, 0);
-//  int8_t rslt;
-  HAL_TIM_Base_Start_IT(&htim1);
+  u8g2_SetContrast(&u8g2, 95);
+
+  /* display init << */
+
+	char tmp_string[20];
+
+	memset(tmp_string, 0, 20);
+
+  u8g2_FirstPage(&u8g2);
+  do
+	 {
+	    u8g2_SetFont(&u8g2, u8g2_font_luBS08_tf);
+//	    u8g2_font_luRS08_tf
+
+	    //	    u8g2_font_ncenB14_tr
 
 
+		u8g2_DrawStr(&u8g2, 0, 14, "Hello world ");
+	 } while (u8g2_NextPage(&u8g2));
 
-  	 uint8_t ds_error = 0;
+  HAL_GPIO_WritePin(CAN_ENABLE_GPIO_Port, CAN_ENABLE_Pin, GPIO_PIN_RESET);
 
-  	 printf("Debug UART is OK!\r\n");
 
-//	if(OW_Reset() == OW_OK)
-//	{
-//		printf("OneWire devices are present :)\r\n");
-//	}
-//	else
-//	{
-//		printf("OneWire no devices :(\r\n");
-//	}
-
-	// arrays to hold device address
-	CurrentDeviceAddress insideThermometer;
-
-	// locate devices on the bus
-	char buf[30];
-
-	printf("Locating devices...");
-	ds_error = DT_Begin();
-	if (ds_error != DS_OK) {
-		sprintf(buf, "DT_Begin err %d", ds_error);
-		printf(buf);
-	}
-
-	printf("Found ");
-	sprintf(buf, "%d", DT_GetDeviceCount());
-	printf(buf);
-	printf(" devices.\r\n");
-
-	// report parasite power requirements
-	printf("Parasite power is: ");
-	if (DT_IsParasitePowerMode()) printf("ON\r\n");
-	else printf("OFF\r\n");
-
-	if (!DT_GetAddress(insideThermometer, 0)) printf("Unable to find address for Device 0\r\n");
-
-	printf("Device 0 Address: ");
-	printAddress(insideThermometer);
-	printf("\r\n");
-
-	// set the resolution to 12 bit (Each Dallas/Maxim device is capable of several different resolutions)
-	DT_SetResolution(insideThermometer, 12, true);
-
-	printf("Device 0 Resolution: ");
-	sprintf(buf, "%d", DT_GetResolution(insideThermometer));
-	printf(buf);
-	printf("\r\n");
 
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	char tmp_string[20];
-
-	memset(tmp_string, 0, 20);
-
-    u8g2_FirstPage(&u8g2);
-    do
-	 {
-	    u8g2_SetFont(&u8g2, u8g2_font_ncenB14_tr);
-		u8g2_DrawStr(&u8g2, 5, 30, "Hello world ");
-	 } while (u8g2_NextPage(&u8g2));
-
-//    read_and_send_ds_data();
 
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-//	  read_and_send_ds_data();
-	  HAL_Delay(2500);
+//	  HAL_Delay(2000);
+//	  send_8080_data_delay_100u(50000);
 //	  struct bme280_data comp_data;
 //	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
 
-	  HAL_Delay(1000);
+	  HAL_Delay(100);
+//	    HAL_GPIO_TogglePin(RELAY0_GPIO_Port, RELAY0_Pin);
+//	    HAL_GPIO_TogglePin(GPIOB, DISPLAY_RESET_Pin);
 
-//	    HAL_GPIO_TogglePin(GPIOC, LED_Pin);
-	  display_update();
+	  testCounter++;
+	  memset(tmp_string, 0, 20);
+
+
+	  u8g2_FirstPage(&u8g2);
+	  do
+	 {
+//		u8g2_font_luRS08_tf
+//		u8g2_font_luBS08_tf
+//		u8g2_font_luIS08_tf
+		  sprintf(tmp_string, "testCounter:%lu", (uint32_t)testCounter);
+		  u8g2_SetFont(&u8g2, u8g2_font_luBS08_tf);
+		  u8g2_DrawStr(&u8g2, 0, 10, tmp_string);
+
+		  u8g2_SetFont(&u8g2, u8g2_font_luRS08_tf);
+
+//		  u8g2_font_5x7_tf
+//		  u8g2_SetFont(&u8g2, u8g2_font_5x7_tf);
+		  u8g2_SetFont(&u8g2, u8g2_font_courR08_tf);
+
+		  sprintf(tmp_string, "temp:%lu%sC", testCounter,"\xb0");
+		  u8g2_DrawStr(&u8g2, 0, 24, tmp_string);
+//		  u8g2_get("\xb0");
+		  sprintf(tmp_string, "hm:%lu", testCounter);
+		  u8g2_DrawStr(&u8g2, 0, 40, tmp_string);
+	 } while (u8g2_NextPage(&u8g2));
+
+
+
+
+	    HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+	  	 printf("OK2!\r\n");
+//	  display_update();
+
+//	  sprintf(screen1_data.str_boiler_value, "ddd1");
+//
+//	  sprintf(screen1_data.str_tempreture_value_1, "ddd2");
+//	  sprintf(screen1_data.str_humidity_value_1, "ddd3");
+//
+//	  sprintf(screen1_data.str_tempreture_value_2, "ddd4");
+//	  sprintf(screen1_data.str_humidity_value_2, "ddd5");
+//
+//	  sprintf(screen1_data.str_pump_status_1, "ddd6");
+//	  sprintf(screen1_data.str_pump_status_2, "ddd7");
+
+//	  display_update2(&u8g2, &screen1_data);
   }
   /* USER CODE END 3 */
 }
@@ -627,20 +629,19 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB busses clocks
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL10;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB busses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -649,7 +650,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -671,7 +672,7 @@ static void MX_CAN_Init(void)
 
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN1;
-  hcan.Init.Prescaler = 9;
+  hcan.Init.Prescaler = 5;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
   hcan.Init.TimeSeg1 = CAN_BS1_6TQ;
@@ -689,44 +690,6 @@ static void MX_CAN_Init(void)
   /* USER CODE BEGIN CAN_Init 2 */
 
   /* USER CODE END CAN_Init 2 */
-
-}
-
-/**
-  * @brief SPI1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_SPI1_Init(void)
-{
-
-  /* USER CODE BEGIN SPI1_Init 0 */
-
-  /* USER CODE END SPI1_Init 0 */
-
-  /* USER CODE BEGIN SPI1_Init 1 */
-
-  /* USER CODE END SPI1_Init 1 */
-  /* SPI1 parameter configuration*/
-  hspi1.Instance = SPI1;
-  hspi1.Init.Mode = SPI_MODE_MASTER;
-  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
-  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
-  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_SOFT;
-  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
-  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
-  hspi1.Init.CRCPolynomial = 10;
-  if (HAL_SPI_Init(&hspi1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN SPI1_Init 2 */
-
-  /* USER CODE END SPI1_Init 2 */
 
 }
 
@@ -777,35 +740,47 @@ static void MX_TIM1_Init(void)
 }
 
 /**
-  * @brief USART1 Initialization Function
+  * @brief TIM2 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_USART1_UART_Init(void)
+static void MX_TIM2_Init(void)
 {
 
-  /* USER CODE BEGIN USART1_Init 0 */
+  /* USER CODE BEGIN TIM2_Init 0 */
 
-  /* USER CODE END USART1_Init 0 */
+  /* USER CODE END TIM2_Init 0 */
 
-  /* USER CODE BEGIN USART1_Init 1 */
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
 
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 115200;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_HalfDuplex_Init(&huart1) != HAL_OK)
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 40;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 10;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN USART1_Init 2 */
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
 
-  /* USER CODE END USART1_Init 2 */
+  /* USER CODE END TIM2_Init 2 */
 
 }
 
@@ -842,25 +817,6 @@ static void MX_USART3_UART_Init(void)
 
 }
 
-/** 
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void) 
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Channel4_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel4_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
-  /* DMA1_Channel5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
-
-}
-
 /**
   * @brief GPIO Initialization Function
   * @param None
@@ -872,7 +828,6 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOC_CLK_ENABLE();
-  __HAL_RCC_GPIOD_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
@@ -880,38 +835,46 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, CS1_DISPLAY_Pin|CS0_BME280_Pin|RELAY0_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, DISPLAY_D0_Pin|DISPLAY_D1_Pin|DISPLAY_D2_Pin|BACKLIGHT_Pin
+                          |DISPLAY_A0_Pin|DISPLAY_RESET_Pin|DISPLAY_CS_Pin|DISPLAY_D3_Pin
+                          |DISPLAY_D4_Pin|DISPLAY_D5_Pin|DISPLAY_D6_Pin|DISPLAY_D7_Pin
+                          |DISPLAY_RD_Pin|DISPLAY_WR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, DISPLAY_RESET_Pin|DISPLAY_DC_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(CAN_ENABLE_GPIO_Port, CAN_ENABLE_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LED_Pin */
   GPIO_InitStruct.Pin = LED_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CS1_DISPLAY_Pin CS0_BME280_Pin */
-  GPIO_InitStruct.Pin = CS1_DISPLAY_Pin|CS0_BME280_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  /*Configure GPIO pins : BUTTON_0_Pin BUTTON_1_Pin BUTTON_2_Pin BUTTON_3_Pin */
+  GPIO_InitStruct.Pin = BUTTON_0_Pin|BUTTON_1_Pin|BUTTON_2_Pin|BUTTON_3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DISPLAY_RESET_Pin DISPLAY_DC_Pin */
-  GPIO_InitStruct.Pin = DISPLAY_RESET_Pin|DISPLAY_DC_Pin;
+  /*Configure GPIO pins : DISPLAY_D0_Pin DISPLAY_D1_Pin DISPLAY_D2_Pin BACKLIGHT_Pin
+                           DISPLAY_A0_Pin DISPLAY_RESET_Pin DISPLAY_CS_Pin DISPLAY_D3_Pin
+                           DISPLAY_D4_Pin DISPLAY_D5_Pin DISPLAY_D6_Pin DISPLAY_D7_Pin
+                           DISPLAY_RD_Pin DISPLAY_WR_Pin */
+  GPIO_InitStruct.Pin = DISPLAY_D0_Pin|DISPLAY_D1_Pin|DISPLAY_D2_Pin|BACKLIGHT_Pin
+                          |DISPLAY_A0_Pin|DISPLAY_RESET_Pin|DISPLAY_CS_Pin|DISPLAY_D3_Pin
+                          |DISPLAY_D4_Pin|DISPLAY_D5_Pin|DISPLAY_D6_Pin|DISPLAY_D7_Pin
+                          |DISPLAY_RD_Pin|DISPLAY_WR_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : RELAY0_Pin */
-  GPIO_InitStruct.Pin = RELAY0_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  /*Configure GPIO pin : CAN_ENABLE_Pin */
+  GPIO_InitStruct.Pin = CAN_ENABLE_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(RELAY0_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(CAN_ENABLE_GPIO_Port, &GPIO_InitStruct);
 
 }
 
@@ -926,7 +889,7 @@ void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan_)
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 {
 	HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData);
-	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+//	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
 
 	 uint32_t u;
 	  u = RxData[0];
@@ -948,7 +911,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 		humidity1timeout = 0;
 		humidity2timeout = 0;
 	}else if(RxHeader.StdId==RELAY_CONTROL_CAN_ID){
-		Control_peripheral_relays(RxData[0]);
+//		Control_peripheral_relays(RxData[0]);
 	}else if(RxHeader.StdId==BOILER_TEMP_CAN_ID){
 		input_packet_boiler_temperature = u;
 		for (int i=0; i<4 ;++i) {
@@ -987,6 +950,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	if(input_packet_boiler_timeout>= DATA_WAIT_TIMEOUT){
 		input_packet_boiler_timeout = DATA_WAIT_TIMEOUT;
 	}
+ } else if ( htim->Instance == TIM2 ) {
+	 if (micro_delay_counter > 0 ) {
+		 micro_delay_counter--;
+	 }
  }
 }
 /* USER CODE END 4 */
@@ -1012,7 +979,7 @@ void Error_Handler(void)
   * @retval None
   */
 void assert_failed(uint8_t *file, uint32_t line)
-{ 
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
