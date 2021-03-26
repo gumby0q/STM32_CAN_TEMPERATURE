@@ -95,6 +95,8 @@ struct bme280_data comp_data;
 
 volatile uint8_t relays_status = 0x00;
 
+volatile uint8_t test_counter = 0x00;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -315,21 +317,21 @@ uint8_t u8x8_byte_4wire_hw_spi(u8x8_t *u8x8, uint8_t msg, uint8_t arg_int,
 }
 
 
-void Control_peripheral_relays(uint8_t flag_holder) {
-	uint8_t flag = 0;
-
-	/* control relays */
-	flag = flag_holder & 0x01;
-	if (flag != 0) {
-		/* on */
-		HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_RESET);
-	} else {
-		/* off */
-		HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_SET);
-	}
-
-	relays_status = flag_holder;
-}
+//void Control_peripheral_relays(uint8_t flag_holder) {
+//	uint8_t flag = 0;
+//
+//	/* control relays */
+//	flag = flag_holder & 0x01;
+//	if (flag != 0) {
+//		/* on */
+//		HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_RESET);
+//	} else {
+//		/* off */
+//		HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_SET);
+//	}
+//
+//	relays_status = flag_holder;
+//}
 
 void read_and_send_ds_data(void) {
 	printf("Requesting temperatures...");
@@ -442,7 +444,6 @@ int main(void)
   /* USER CODE BEGIN 1 */
 
   /* USER CODE END 1 */
-  
 
   /* MCU Configuration--------------------------------------------------------*/
 
@@ -471,7 +472,8 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /* off realays */
-  HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_SET);
+//  HAL_GPIO_WritePin(RELAY0_GPIO_Port, RELAY0_Pin, GPIO_PIN_SET);
+  HAL_GPIO_WritePin(GPIOA, CAN_ENABLE_Pin, GPIO_PIN_RESET);
 
 
 
@@ -516,86 +518,86 @@ int main(void)
   TxData[3] = 4;
 
 
-  HAL_GPIO_WritePin(CS0_BME280_GPIO_Port, CS0_BME280_Pin, GPIO_PIN_SET);
-  setup_bme280();
-
-
-  HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_SET);
-  u8g2_Setup_ssd1306_128x64_noname_1(&u8g2,
-									 U8G2_R1,
-									 u8x8_byte_4wire_hw_spi,
-									 u8x8_stm32_gpio_and_delay);
-  u8g2_InitDisplay(&u8g2);
-  u8g2_SetPowerSave(&u8g2, 0);
-//  int8_t rslt;
-  HAL_TIM_Base_Start_IT(&htim1);
-
-
-
-  	 uint8_t ds_error = 0;
-
-  	 printf("Debug UART is OK!\r\n");
-
-//	if(OW_Reset() == OW_OK)
-//	{
-//		printf("OneWire devices are present :)\r\n");
+//  HAL_GPIO_WritePin(CS0_BME280_GPIO_Port, CS0_BME280_Pin, GPIO_PIN_SET);
+//  setup_bme280();
+//
+//
+//  HAL_GPIO_WritePin(CS1_DISPLAY_GPIO_Port, CS1_DISPLAY_Pin, GPIO_PIN_SET);
+//  u8g2_Setup_ssd1306_128x64_noname_1(&u8g2,
+//									 U8G2_R1,
+//									 u8x8_byte_4wire_hw_spi,
+//									 u8x8_stm32_gpio_and_delay);
+//  u8g2_InitDisplay(&u8g2);
+//  u8g2_SetPowerSave(&u8g2, 0);
+////  int8_t rslt;
+//  HAL_TIM_Base_Start_IT(&htim1);
+//
+//
+//
+//  	 uint8_t ds_error = 0;
+//
+//  	 printf("Debug UART is OK!\r\n");
+//
+////	if(OW_Reset() == OW_OK)
+////	{
+////		printf("OneWire devices are present :)\r\n");
+////	}
+////	else
+////	{
+////		printf("OneWire no devices :(\r\n");
+////	}
+//
+//	// arrays to hold device address
+//	CurrentDeviceAddress insideThermometer;
+//
+//	// locate devices on the bus
+//	char buf[30];
+//
+//	printf("Locating devices...");
+//	ds_error = DT_Begin();
+//	if (ds_error != DS_OK) {
+//		sprintf(buf, "DT_Begin err %d", ds_error);
+//		printf(buf);
 //	}
-//	else
-//	{
-//		printf("OneWire no devices :(\r\n");
-//	}
-
-	// arrays to hold device address
-	CurrentDeviceAddress insideThermometer;
-
-	// locate devices on the bus
-	char buf[30];
-
-	printf("Locating devices...");
-	ds_error = DT_Begin();
-	if (ds_error != DS_OK) {
-		sprintf(buf, "DT_Begin err %d", ds_error);
-		printf(buf);
-	}
-
-	printf("Found ");
-	sprintf(buf, "%d", DT_GetDeviceCount());
-	printf(buf);
-	printf(" devices.\r\n");
-
-	// report parasite power requirements
-	printf("Parasite power is: ");
-	if (DT_IsParasitePowerMode()) printf("ON\r\n");
-	else printf("OFF\r\n");
-
-	if (!DT_GetAddress(insideThermometer, 0)) printf("Unable to find address for Device 0\r\n");
-
-	printf("Device 0 Address: ");
-	printAddress(insideThermometer);
-	printf("\r\n");
-
-	// set the resolution to 12 bit (Each Dallas/Maxim device is capable of several different resolutions)
-	DT_SetResolution(insideThermometer, 12, true);
-
-	printf("Device 0 Resolution: ");
-	sprintf(buf, "%d", DT_GetResolution(insideThermometer));
-	printf(buf);
-	printf("\r\n");
-
+//
+//	printf("Found ");
+//	sprintf(buf, "%d", DT_GetDeviceCount());
+//	printf(buf);
+//	printf(" devices.\r\n");
+//
+//	// report parasite power requirements
+//	printf("Parasite power is: ");
+//	if (DT_IsParasitePowerMode()) printf("ON\r\n");
+//	else printf("OFF\r\n");
+//
+//	if (!DT_GetAddress(insideThermometer, 0)) printf("Unable to find address for Device 0\r\n");
+//
+//	printf("Device 0 Address: ");
+//	printAddress(insideThermometer);
+//	printf("\r\n");
+//
+//	// set the resolution to 12 bit (Each Dallas/Maxim device is capable of several different resolutions)
+//	DT_SetResolution(insideThermometer, 12, true);
+//
+//	printf("Device 0 Resolution: ");
+//	sprintf(buf, "%d", DT_GetResolution(insideThermometer));
+//	printf(buf);
+//	printf("\r\n");
+//
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	char tmp_string[20];
-
-	memset(tmp_string, 0, 20);
-
-    u8g2_FirstPage(&u8g2);
-    do
-	 {
-	    u8g2_SetFont(&u8g2, u8g2_font_ncenB14_tr);
-		u8g2_DrawStr(&u8g2, 5, 30, "Hello world ");
-	 } while (u8g2_NextPage(&u8g2));
+//	char tmp_string[20];
+//
+//	memset(tmp_string, 0, 20);
+//
+//    u8g2_FirstPage(&u8g2);
+//    do
+//	 {
+//	    u8g2_SetFont(&u8g2, u8g2_font_ncenB14_tr);
+//		u8g2_DrawStr(&u8g2, 5, 30, "Hello world ");
+//	 } while (u8g2_NextPage(&u8g2));
 
 //    read_and_send_ds_data();
 
@@ -605,15 +607,21 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 //	  read_and_send_ds_data();
-	  HAL_Delay(2500);
+	  HAL_Delay(1000);
 //	  struct bme280_data comp_data;
 //	  rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 //      sprintf(tmp_string, "%ld, %ld, %ld\r\n",comp_data.temperature, comp_data.pressure, comp_data.humidity);
 
-	  HAL_Delay(1000);
+//	  HAL_Delay(1000);
 
-//	    HAL_GPIO_TogglePin(GPIOC, LED_Pin);
-	  display_update();
+	  test_counter++;
+		TxHeader.StdId = RELAY_STATUS_CAN_ID;
+		TxHeader.DLC = 1;
+		TxData[0] = test_counter;
+		HAL_CAN_AddTxMessage(&hcan, &TxHeader, TxData, &TxMailbox);
+
+	    HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+//	  display_update();
   }
   /* USER CODE END 3 */
 }
@@ -627,20 +635,19 @@ void SystemClock_Config(void)
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
 
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB busses clocks
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI_DIV2;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL10;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
   }
-  /** Initializes the CPU, AHB and APB busses clocks 
+  /** Initializes the CPU, AHB and APB busses clocks
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
@@ -649,7 +656,7 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
   {
     Error_Handler();
   }
@@ -671,7 +678,7 @@ static void MX_CAN_Init(void)
 
   /* USER CODE END CAN_Init 1 */
   hcan.Instance = CAN1;
-  hcan.Init.Prescaler = 9;
+  hcan.Init.Prescaler = 5;
   hcan.Init.Mode = CAN_MODE_NORMAL;
   hcan.Init.SyncJumpWidth = CAN_SJW_1TQ;
   hcan.Init.TimeSeg1 = CAN_BS1_6TQ;
@@ -842,10 +849,10 @@ static void MX_USART3_UART_Init(void)
 
 }
 
-/** 
+/**
   * Enable DMA controller clock
   */
-static void MX_DMA_Init(void) 
+static void MX_DMA_Init(void)
 {
 
   /* DMA controller clock enable */
@@ -880,38 +887,44 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(LED_GPIO_Port, LED_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, CS1_DISPLAY_Pin|CS0_BME280_Pin|RELAY0_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, CS1_DISPLAY_Pin|CS0_BME280_Pin|CAN_ENABLE_Pin|RELAY_0_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, DISPLAY_RESET_Pin|DISPLAY_DC_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, DISPLAY_RESET_Pin|DISPLAY_DC_Pin|RELAY_1_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : LED_Pin */
   GPIO_InitStruct.Pin = LED_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LED_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CS1_DISPLAY_Pin CS0_BME280_Pin */
-  GPIO_InitStruct.Pin = CS1_DISPLAY_Pin|CS0_BME280_Pin;
+  /*Configure GPIO pins : CS1_DISPLAY_Pin CS0_BME280_Pin CAN_ENABLE_Pin */
+  GPIO_InitStruct.Pin = CS1_DISPLAY_Pin|CS0_BME280_Pin|CAN_ENABLE_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DISPLAY_RESET_Pin DISPLAY_DC_Pin */
-  GPIO_InitStruct.Pin = DISPLAY_RESET_Pin|DISPLAY_DC_Pin;
+  /*Configure GPIO pins : DISPLAY_RESET_Pin DISPLAY_DC_Pin RELAY_1_Pin */
+  GPIO_InitStruct.Pin = DISPLAY_RESET_Pin|DISPLAY_DC_Pin|RELAY_1_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : RELAY0_Pin */
-  GPIO_InitStruct.Pin = RELAY0_Pin;
+  /*Configure GPIO pin : RELAY_0_Pin */
+  GPIO_InitStruct.Pin = RELAY_0_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(RELAY0_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(RELAY_0_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : BUTTON_0_Pin BUTTON_1_Pin BUTTON_2_Pin BUTTON_3_Pin */
+  GPIO_InitStruct.Pin = BUTTON_0_Pin|BUTTON_1_Pin|BUTTON_2_Pin|BUTTON_3_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 
@@ -926,36 +939,36 @@ void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan_)
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_)
 {
 	HAL_CAN_GetRxMessage(&hcan, CAN_RX_FIFO0, &RxHeader, RxData);
-	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
-
-	 uint32_t u;
-	  u = RxData[0];
-	  u += (uint32_t)(RxData[1] << 8);
-	  u += (uint32_t)(RxData[2] << 16);
-	  u += (uint32_t)(RxData[3] << 24);
-
-
-
-
-	if(RxHeader.StdId==0xf0){
-		pressure = u;
-	}else if(RxHeader.StdId==0xf0+1){
-		temperature = u;
-		temperature1timeout = 0;
-		temperature2timeout = 0;
-	}else if(RxHeader.StdId==0xf0+2){
-		humidity = u;
-		humidity1timeout = 0;
-		humidity2timeout = 0;
-	}else if(RxHeader.StdId==RELAY_CONTROL_CAN_ID){
-		Control_peripheral_relays(RxData[0]);
-	}else if(RxHeader.StdId==BOILER_TEMP_CAN_ID){
-		input_packet_boiler_temperature = u;
-		for (int i=0; i<4 ;++i) {
-			((uint8_t*)&input_packet_boiler_temperature)[i] = RxData[i];
-		}
-		input_packet_boiler_timeout = 0;
-	}
+//	HAL_GPIO_TogglePin(GPIOC, LED_Pin);
+//
+//	 uint32_t u;
+//	  u = RxData[0];
+//	  u += (uint32_t)(RxData[1] << 8);
+//	  u += (uint32_t)(RxData[2] << 16);
+//	  u += (uint32_t)(RxData[3] << 24);
+//
+//
+//
+//
+//	if(RxHeader.StdId==0xf0){
+//		pressure = u;
+//	}else if(RxHeader.StdId==0xf0+1){
+//		temperature = u;
+//		temperature1timeout = 0;
+//		temperature2timeout = 0;
+//	}else if(RxHeader.StdId==0xf0+2){
+//		humidity = u;
+//		humidity1timeout = 0;
+//		humidity2timeout = 0;
+//	}else if(RxHeader.StdId==RELAY_CONTROL_CAN_ID){
+//		Control_peripheral_relays(RxData[0]);
+//	}else if(RxHeader.StdId==BOILER_TEMP_CAN_ID){
+//		input_packet_boiler_temperature = u;
+//		for (int i=0; i<4 ;++i) {
+//			((uint8_t*)&input_packet_boiler_temperature)[i] = RxData[i];
+//		}
+//		input_packet_boiler_timeout = 0;
+//	}
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
@@ -1012,7 +1025,7 @@ void Error_Handler(void)
   * @retval None
   */
 void assert_failed(uint8_t *file, uint32_t line)
-{ 
+{
   /* USER CODE BEGIN 6 */
   /* User can add his own implementation to report the file name and line number,
      tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
